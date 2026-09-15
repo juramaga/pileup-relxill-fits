@@ -1,0 +1,66 @@
+{
+  "spectrum": "piled",
+  "stage": "D",
+  "method": "neldermead",
+  "nfree": 8,
+  "maxfev": 3200,
+  "succeeded": true,
+  "message": "Optimization terminated successfully",
+  "statval": 1240.8563104494383,
+  "statname": "cstat",
+  "numpoints": 665,
+  "dof": 657,
+  "rstat": 1.8886701833324784,
+  "nfev": 3191,
+  "parnames": [
+    "pileup_piled.alpha",
+    "pileup_piled.f",
+    "abs_piled.nH",
+    "refl_piled.a",
+    "refl_piled.gamma",
+    "refl_piled.logxi",
+    "refl_piled.refl_frac",
+    "refl_piled.norm"
+  ],
+  "parvals": [
+    0.7513096368723644,
+    0.9960472638917091,
+    0.6993440553622753,
+    0.7783557598106906,
+    1.3485940051604468,
+    0.2462488957814481,
+    49.23424530309291,
+    0.03518351407025
+  ],
+  "covar_parnames": [
+    "pileup_piled.alpha",
+    "pileup_piled.f",
+    "abs_piled.nH",
+    "refl_piled.a",
+    "refl_piled.gamma",
+    "refl_piled.logxi",
+    "refl_piled.refl_frac",
+    "refl_piled.norm"
+  ],
+  "covar_parmins": [
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null
+  ],
+  "covar_parmaxes": [
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null
+  ],
+  "wall_time_s": 40.70465803146362
+}

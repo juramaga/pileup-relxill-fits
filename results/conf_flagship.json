@@ -1,0 +1,178 @@
+{
+  "unpiled": {
+    "spectrum": "unpiled",
+    "stage": "B",
+    "method": "levmar",
+    "statval": 2054.500184204369,
+    "dof": 657,
+    "rstat": 3.127093126642875,
+    "fit_time_s": 0.7491459846496582,
+    "covar_time_s": 0.7961759567260742,
+    "conf_time_s": 12.116959810256958,
+    "parnames": [
+      "abs_unpiled.nH",
+      "refl_unpiled.a",
+      "refl_unpiled.Incl",
+      "refl_unpiled.gamma",
+      "refl_unpiled.logxi",
+      "refl_unpiled.Afe",
+      "refl_unpiled.refl_frac",
+      "refl_unpiled.norm"
+    ],
+    "parvals": [
+      0.5872336609218345,
+      0.4772290302291942,
+      32.05146625217308,
+      1.405809795696857,
+      1.0065752125080656,
+      2.400940655106675,
+      23.634884398284917,
+      0.001851917567025237
+    ],
+    "covar_parmins": [
+      -0.001986319769906384,
+      -7.71777289491113e-05,
+      -0.035878085920529726,
+      -0.001968172063279863,
+      -0.028583432189516235,
+      -0.01828610630622046,
+      -0.2048007683252828,
+      -1.5939739168529416e-06
+    ],
+    "covar_parmaxes": [
+      0.001986319769906384,
+      7.71777289491113e-05,
+      0.035878085920529726,
+      0.001968172063279863,
+      0.028583432189516235,
+      0.01828610630622046,
+      0.2048007683252828,
+      1.5939739168529416e-06
+    ],
+    "conf_parnames": [
+      "abs_unpiled.nH",
+      "refl_unpiled.a",
+      "refl_unpiled.Incl",
+      "refl_unpiled.gamma",
+      "refl_unpiled.logxi",
+      "refl_unpiled.Afe",
+      "refl_unpiled.refl_frac",
+      "refl_unpiled.norm"
+    ],
+    "conf_parmins": [
+      -0.0029794796548595626,
+      -0.005484565725955848,
+      -0.11432539061059543,
+      -0.010671182905595433,
+      -0.014944341391496807,
+      -0.019971672532108187,
+      -0.6922320691901334,
+      -4.860790289266514e-06
+    ],
+    "conf_parmaxes": [
+      0.003738897809076658,
+      0.010606226487231862,
+      0.10403499687027562,
+      0.0029830107834083464,
+      0.08126254157385215,
+      0.04944426587031092,
+      0.18624238237685375,
+      8.485745163338719e-06
+    ]
+  },
+  "piled": {
+    "spectrum": "piled",
+    "stage": "B",
+    "method": "neldermead",
+    "statval": 1039.8880904275497,
+    "dof": 655,
+    "rstat": 1.5876154052329003,
+    "fit_time_s": 49.06526494026184,
+    "covar_time_s": 3.0725009441375732,
+    "conf_time_s": 2490.4344959259033,
+    "parnames": [
+      "pileup_piled.alpha",
+      "pileup_piled.f",
+      "abs_piled.nH",
+      "refl_piled.a",
+      "refl_piled.Incl",
+      "refl_piled.gamma",
+      "refl_piled.logxi",
+      "refl_piled.Afe",
+      "refl_piled.refl_frac",
+      "refl_piled.norm"
+    ],
+    "parvals": [
+      0.3435795681333325,
+      0.9920713814620246,
+      0.6942809685379578,
+      0.8660151032747868,
+      31.603416436463586,
+      1.0000366771633578,
+      2.301033928459773,
+      3.2330363094211303,
+      19.186429449666146,
+      0.01718123432978821
+    ],
+    "covar_parmins": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+    ],
+    "covar_parmaxes": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+    ],
+    "conf_parnames": [
+      "pileup_piled.alpha",
+      "pileup_piled.f",
+      "abs_piled.nH",
+      "refl_piled.a",
+      "refl_piled.Incl",
+      "refl_piled.gamma",
+      "refl_piled.logxi",
+      "refl_piled.Afe",
+      "refl_piled.refl_frac",
+      "refl_piled.norm"
+    ],
+    "conf_parmins": [
+      null,
+      null,
+      -0.011250370653136055,
+      -0.012503704175947372,
+      -0.5739662880041223,
+      null,
+      null,
+      -0.16809480840174684,
+      -0.7166609617624502,
+      -0.013088800887845092
+    ],
+    "conf_parmaxes": [
+      null,
+      0.00789571167392622,
+      0.013622727422368586,
+      0.013897663026170681,
+      0.28897089548735977,
+      0.18568852135964753,
+      0.01855522386474373,
+      0.13606375977615492,
+      0.24902771040687455,
+      0.0182788366533372
+    ]
+  }
+}

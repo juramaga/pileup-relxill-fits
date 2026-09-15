@@ -1,0 +1,20 @@
+# Large source data -- see CLAUDE.md for how to obtain/regenerate these
+v0017_800ks_cspec_datatable.fits
+v0017_800ks_index.csv
+
+# relxill source + FITS tables (third-party, ~1GB; download instructions
+# in CLAUDE.md Phase 1). build_attempt*.log are kept (small, useful history).
+relxill/src/
+relxill/tables/
+relxill/relxill_model_v2.9.0.tgz
+
+# macOS zip extraction artifact
+__MACOSX/
+
+# Python
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# OS
+.DS_Store

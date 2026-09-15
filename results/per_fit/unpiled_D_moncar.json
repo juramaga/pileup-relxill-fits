@@ -1,0 +1,56 @@
+{
+  "spectrum": "unpiled",
+  "stage": "D",
+  "method": "moncar",
+  "nfree": 6,
+  "maxfev": 4200,
+  "succeeded": false,
+  "message": "number of function evaluations has exceeded maxfev=4200",
+  "statval": 6138.109144308643,
+  "statname": "cstat",
+  "numpoints": 665,
+  "dof": 659,
+  "rstat": 9.31427791245621,
+  "nfev": 4200,
+  "parnames": [
+    "abs_unpiled.nH",
+    "refl_unpiled.a",
+    "refl_unpiled.gamma",
+    "refl_unpiled.logxi",
+    "refl_unpiled.refl_frac",
+    "refl_unpiled.norm"
+  ],
+  "parvals": [
+    0.5747284124941121,
+    0.09493892846261082,
+    1.6584030139888764,
+    0.022011076460411335,
+    51.526141608373365,
+    0.0019158585889138767
+  ],
+  "covar_parnames": [
+    "abs_unpiled.nH",
+    "refl_unpiled.a",
+    "refl_unpiled.gamma",
+    "refl_unpiled.logxi",
+    "refl_unpiled.refl_frac",
+    "refl_unpiled.norm"
+  ],
+  "covar_parmins": [
+    -0.0018705315906390873,
+    null,
+    -0.0013950093977284058,
+    null,
+    -0.3859178600063667,
+    -1.390677372186755e-06
+  ],
+  "covar_parmaxes": [
+    0.0018705315906390873,
+    null,
+    0.0013950093977284058,
+    0.03111288496694911,
+    0.3859178600063667,
+    1.390677372186755e-06
+  ],
+  "wall_time_s": 22.89458990097046
+}
