@@ -18,7 +18,9 @@ import traceback
 from sherpa.astro import ui
 
 from load_data import setup_data
-from build_models import build_unpiled_model, build_piled_model
+from build_models import (
+    build_unpiled_model, build_piled_model, build_piled_naive_model,
+)
 
 
 def count_thawed(*models):
@@ -37,7 +39,8 @@ def maxfev_for(method, nfree):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--spectrum", required=True, choices=["unpiled", "piled"])
+    ap.add_argument("--spectrum", required=True,
+                     choices=["unpiled", "piled", "piled_naive"])
     ap.add_argument("--stage", required=True, choices=["A", "B", "C", "D"])
     ap.add_argument("--method", required=True,
                      choices=["levmar", "neldermead", "moncar"])
@@ -50,8 +53,12 @@ def main():
         absmodel, relmodel = build_unpiled_model(id_unpiled, args.stage)
         pmod = None
         fit_id = id_unpiled
-    else:
+    elif args.spectrum == "piled":
         absmodel, relmodel, pmod = build_piled_model(id_piled, args.stage)
+        fit_id = id_piled
+    else:  # piled_naive: piled *data*, plain (no jdpileup) model
+        absmodel, relmodel = build_piled_naive_model(id_piled, args.stage)
+        pmod = None
         fit_id = id_piled
 
     models = [absmodel, relmodel] + ([pmod] if pmod is not None else [])

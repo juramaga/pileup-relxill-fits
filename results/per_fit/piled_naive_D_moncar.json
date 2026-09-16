@@ -1,0 +1,56 @@
+{
+  "spectrum": "piled_naive",
+  "stage": "D",
+  "method": "moncar",
+  "nfree": 6,
+  "maxfev": 4200,
+  "succeeded": false,
+  "message": "number of function evaluations has exceeded maxfev=4200",
+  "statval": 1128.435982672948,
+  "statname": "cstat",
+  "numpoints": 665,
+  "dof": 659,
+  "rstat": 1.7123459524627436,
+  "nfev": 4200,
+  "parnames": [
+    "abs_piled_naive.nH",
+    "refl_piled_naive.a",
+    "refl_piled_naive.gamma",
+    "refl_piled_naive.logxi",
+    "refl_piled_naive.refl_frac",
+    "refl_piled_naive.norm"
+  ],
+  "parvals": [
+    0.6501735955617729,
+    0.7360271766524704,
+    1.522812219917535,
+    0.2977747058813513,
+    94.07200410869186,
+    0.00013925768950561815
+  ],
+  "covar_parnames": [
+    "abs_piled_naive.nH",
+    "refl_piled_naive.a",
+    "refl_piled_naive.gamma",
+    "refl_piled_naive.logxi",
+    "refl_piled_naive.refl_frac",
+    "refl_piled_naive.norm"
+  ],
+  "covar_parmins": [
+    null,
+    null,
+    null,
+    null,
+    null,
+    null
+  ],
+  "covar_parmaxes": [
+    null,
+    null,
+    null,
+    null,
+    null,
+    null
+  ],
+  "wall_time_s": 23.110471963882446
+}

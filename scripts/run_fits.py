@@ -10,6 +10,9 @@ survive. Subprocess isolation means a crashed combination is recorded as
 CRASHED and the batch continues, instead of losing everything after it.
 
 Combines all per-combination JSON files into results/fits_raw.json.
+Skips recomputing a combination if its results/per_fit/<combo>.json already
+exists (pass force=True to run_one() to override) -- so re-running after
+adding a new spectrum/stage/method only computes the new combinations.
 Run: python run_fits.py
 """
 import json
@@ -28,12 +31,18 @@ PER_FIT_DIR.mkdir(exist_ok=True)
 OUTFILE = RESULTS_DIR / "fits_raw.json"
 
 METHODS = ["levmar", "neldermead", "moncar"]
-SPECTRA = ["unpiled", "piled"]
+# piled_naive: the piled *data*, fit with the plain (no jdpileup) model --
+# added after the original 24-combo grid to quantify pileup bias with vs.
+# without correcting for it (see CLAUDE.md Phase 3/5).
+SPECTRA = ["unpiled", "piled", "piled_naive"]
 TIMEOUT_S = 600
 
 
-def run_one(spectrum, stage, method):
+def run_one(spectrum, stage, method, force=False):
     outfile = PER_FIT_DIR / f"{spectrum}_{stage}_{method}.json"
+    if not force and outfile.exists():
+        with open(outfile) as f:
+            return json.load(f)
     cmd = [sys.executable, "fit_worker.py",
            "--spectrum", spectrum, "--stage", stage, "--method", method,
            "--outfile", str(outfile)]

@@ -294,6 +294,16 @@ was checked:
     file header) to override the instrumental ones with for this
     simulation — noted explicitly here and should be repeated in the
     write-up as an assumption, not a measured fact.
+- **Piled, uncorrected for pileup ("piled_naive"; added 2026-09-15 per user
+  request)**: `xstbabs.abs_piled_naive * xsumrelxill.refl_piled_naive` fit
+  directly against the **piled** spectrum's data, with **no** `jdpileup`
+  wrap at all (`build_piled_naive_model()`) — i.e. exactly the mistake an
+  analyst makes if they fit a pileup-affected Chandra spectrum without
+  realizing/correcting for pileup. This is a third, deliberately-mismatched
+  case alongside the unpiled and jdpileup-corrected piled fits, specifically
+  to quantify *how much* parameter bias pileup causes when left uncorrected
+  versus when it's modeled — see Phase 5 for the three-way comparison this
+  was added for.
 - **`apply_stage()`** implements the Stage A-D freezing ladder from the plan
   above and is applied identically (same parameter names, same frozen
   values) to both the unpiled and piled relxill components — verified in
@@ -368,9 +378,17 @@ documented starting point (`RELXILL_START`/`ABS_START`/`PILEUP_START`) on
 every call, so every (stage, method) combination genuinely starts fresh, as
 required below. `scripts/fit_worker.py` runs exactly one (spectrum, stage,
 method) fit and writes its result as JSON; `scripts/run_fits.py` runs all
-24 combinations (2 spectra x 4 stages x 3 methods) **each as its own
-subprocess** and combines the results into `results/fits_raw.json`
-(per-combo JSON also kept under `results/per_fit/`).
+combinations **each as its own subprocess** and combines the results into
+`results/fits_raw.json` (per-combo JSON also kept under `results/per_fit/`).
+Originally 24 combinations (2 spectra x 4 stages x 3 methods); extended on
+2026-09-15 (see below) to 36 by adding a third spectrum case,
+**`piled_naive`** — the piled data fit with the plain, unpiled-style model
+(no `jdpileup` wrap) — per user request, specifically to quantify pileup
+bias with vs. without correcting for it. `run_fits.py` skips recomputing
+any combination whose `results/per_fit/*.json` already exists, so adding
+this third case only cost the time for the 12 new combinations (plus
+naturally re-running the 3 combinations that crash — see below — since
+those never produce a per-combo file to skip on).
 
 **Why subprocesses, not one long-lived Sherpa session:** relxill's C++ code
 calls a hard, uncatchable process `abort()` (not a Python exception -- a
@@ -393,7 +411,20 @@ freezing ladder (Phase 3) is standard practice, not an arbitrary
 simplification: for the piled/pileup case here, "fit everything" isn't
 just poorly constrained, it's not computable.
 
-**Results summary (`results/fits_raw.json`, 24 combos, 3 crashed):**
+**Update (2026-09-15): the crash isn't specific to pileup's extra
+parameters.** Adding `piled_naive` (13 free params, same as unpiled's
+Stage A — no `alpha`/`f`) and running its Stage A showed all three
+optimizers crash on it too. So the earlier framing above (blaming pileup's
+*extra* free parameters) was too narrow: the *piled data itself* — its
+different, lower-count shape — is enough to send the same 13-parameter
+Stage A search into `Rout<=Rin` territory that the *unpiled* data's Stage A
+never reaches with the same starting point and bounds. The real
+generalization: Stage A's numerical fragility depends on the data being
+fit, not just on how many parameters are free — another reason not to
+trust "it worked on one spectrum" as validation that a fully-free
+`relxill` fit is safe on another.
+
+**Results summary (`results/fits_raw.json`, 36 combos, 6 crashed):**
 - **Unpiled**: all 12 combos completed. Stage B gives the best fit by far
   (cstat ~2052-2185 across methods, reduced stat ~3.1-3.3) — notably
   *better* than Stage C (~6013-6713, rstat ~9.1-10.2) and Stage D
@@ -420,6 +451,17 @@ just poorly constrained, it's not computable.
   starting point that works fine on the unpiled data — not a bug in the
   pileup model itself (which does clearly fit *something* well, just not
   via `levmar` from these defaults).
+- **`piled_naive`** (piled data, no `jdpileup` — added 2026-09-15): Stage A
+  crashed for all 3 methods too (see the update above). For Stages B-D, the
+  fit statistic is actually *as good or slightly better* than the
+  jdpileup-corrected piled fit (Stage B best: `neldermead`, cstat=1005.85,
+  rstat=1.53, vs. the corrected fit's cstat=1039.89, rstat=1.59) — i.e.
+  **a good fit statistic alone does not tell you whether pileup has been
+  handled correctly**: `relxill`'s own free parameters (mainly `refl_frac`,
+  see Phase 5) are flexible enough to partially absorb pileup's spectral
+  distortion and produce an equally-good-looking fit to a *biased* model.
+  This is the central reason the comparison was worth adding — see Phase 5
+  for the full three-way parameter comparison against ground truth.
 - A `covar`-based error estimate was computed for every completed fit and
   is stored alongside each record. As expected, `covar` on a non-converged
   fit (several `neldermead`/`moncar` results have `succeeded=False`, having
@@ -498,6 +540,53 @@ how the project should be described going forward:
   the band, growing toward the low-count band edges) despite reduced
   stat > 1 — another data point for "formally imperfect but practically
   fine" given how much statistical leverage millions of counts provide.
+
+**Update (2026-09-15): added `piled_naive` (piled data, no `jdpileup`) —
+the "what if you forgot to correct for pileup" control — and reran the
+full Phase 5 pipeline (`analyze_results.py`, `run_conf_flagship.py`,
+`make_plots.py`, `write_report.py`) to include it. This produced the
+project's most important single result, now the report's headline
+three-way Stage-B table (`unpiled` vs. `piled` vs. `piled_naive` vs.
+ground truth):**
+- **A good fit statistic does not indicate pileup was handled correctly.**
+  `piled_naive`'s best Stage B fit (cstat~1005.9, rstat~1.53) is as good
+  as, or marginally better than, the jdpileup-corrected `piled` fit
+  (cstat~1039.9, rstat~1.59) and looks just as good in the diagnostic
+  plots — despite using the structurally wrong model. `relxill`'s own
+  flexibility (mainly via `refl_frac`) partially absorbs pileup's
+  distortion.
+- **`jdpileup` correction does not rescue the spin measurement here.**
+  Spin is biased ~76-78% high in *both* piled cases (corrected and
+  uncorrected alike), versus the unpiled fit's close-to-truth ~-3%. This
+  is arguably the single most consequential finding for anyone using
+  `relxill` + `jdpileup` on Chandra data to measure spin.
+  `refl_frac` is the parameter most sensitive to *whether* pileup was
+  corrected for (uncorrected +134% vs. corrected +34% vs. unpiled +65%),
+  even though it doesn't track spin's failure mode — a candidate
+  real-world diagnostic (implausibly large `refl_frac`) for "pileup
+  probably wasn't handled" when no ground truth is available.
+- Also clarified an earlier Phase 4 finding: the piled-spectrum Stage A
+  crash and the piled-spectrum `levmar`-gets-stuck pattern are **not both**
+  caused by the same thing. `piled_naive`'s Stage A (13 params, no pileup
+  params) crashes too, on all three optimizers — so the crash is driven by
+  the piled *data's shape*, not pileup's extra parameters. But
+  `piled_naive`'s `levmar` at Stage B does *not* get stuck (cstat~1046,
+  essentially tied with `neldermead`) — so the `levmar`-gets-stuck-on-piled
+  pattern *is* specifically attributable to `jdpileup`'s own nonlinear
+  machinery, not the piled data alone. Two distinct phenomena that looked
+  like one until this control case separated them.
+- Hit and fixed a real bug while making the three-way diagnostic plots:
+  Sherpa's `set_pileup_model()` attaches to the *dataset*, not the source
+  model, and is **not** cleared by a later `set_source()` call. Building
+  `piled` and then `piled_naive` in the same session without explicitly
+  calling `delete_pileup_model()` first silently left the old `jdpileup`
+  wrap active underneath the "uncorrected" model. Caught it from an
+  implausible-looking first attempt at the `piled_naive` ratio plot (model
+  running ~2-4x below the data despite a good `cstat`) — fixed in
+  `build_piled_naive_model()` itself (defensive `delete_pileup_model()`
+  call) so it can't recur regardless of call order. The actual Phase 4
+  grid fits were never affected, since `fit_worker.py` runs every
+  combination in a fresh subprocess/session.
 
 For every (spectrum × stage × method) combination, capture:
 - Final fit statistic value, statistic/dof, dof.

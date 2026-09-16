@@ -11,6 +11,28 @@ Generated from `results/fits_raw.json`, `results/analysis_summary.json`, and `re
 - **Stage C**: Stage B + Afe=1 (solar)
 - **Stage D**: Stage C + Incl fixed at ground truth (~30.9 deg)
 
+## Three spectrum/model cases compared
+
+- **unpiled**: the pileup-free spectrum, fit with `tbabs*relxill`.
+- **piled**: the pileup-affected spectrum, fit with `tbabs*relxill` wrapped in Sherpa's `jdpileup` model -- the physically correct treatment.
+- **piled_naive**: the *same* pileup-affected spectrum, fit with plain `tbabs*relxill` and **no** pileup correction at all -- the mistake an analyst makes by not realizing/correcting for pileup. Added specifically to quantify how much parameter bias pileup causes *with* vs. *without* correcting for it (see the three-way comparison immediately below).
+
+## Headline result: Stage B, all three cases vs. ground truth
+
+This is the comparison of primary interest -- the literature-standard freezing stage, for all three spectrum/model cases, each using its own best formally-converged method.
+
+| Parameter | Ground truth | unpiled | piled (corrected) | piled_naive (uncorrected) |
+|---|---|---|---|---|
+| spin (a) | 0.493 | 0.477 (-3.2%) | 0.866 (75.7%) | 0.876 (77.7%) |
+| Incl (deg) | 30.881 | 32.051 (3.8%) | 31.603 (2.3%) | 31.498 (2.0%) |
+| gamma | 1.331 | 1.406 (5.7%) | 1.000 (-24.8%) | 1.227 (-7.8%) |
+| logxi | 1.497 | 1.007 (-32.7%) | 2.301 (53.8%) | 1.208 (-19.3%) |
+| Afe | 2.631 | 2.401 (-8.7%) | 3.233 (22.9%) | 2.211 (-16.0%) |
+| refl_frac | 14.315 | 23.635 (65.1%) | 19.186 (34.0%) | 33.519 (134.2%) |
+| nH (1e22 cm^-2) | 0.650 | 0.587 (-9.6%) | 0.694 (6.9%) | 0.691 (6.4%) |
+
+**Read this as**: `unpiled` is the baseline (pileup-free, closest to a "clean" measurement); `piled` shows what you get *after* correcting for pileup with `jdpileup`; `piled_naive` shows what you'd get if you fit the exact same pileup-affected data *without* realizing/correcting for pileup. See "Interpretation" after the table.
+
 ## Unpiled spectrum
 
 | Stage | Method | Converged | cstat | dof | reduced stat | nfev | wall time (s) |
@@ -126,13 +148,13 @@ Converged methods compared: levmar, neldermead
 | nH | 1.0% |
 | norm | 0.0% |
 
-## Piled (pileup-affected) spectrum
+## Piled spectrum (jdpileup-corrected)
 
 | Stage | Method | Converged | cstat | dof | reduced stat | nfev | wall time (s) |
 |---|---|---|---|---|---|---|---|
-| A | levmar | **CRASHED** | -- | -- | -- | -- | 6.3 |
-| A | neldermead | **CRASHED** | -- | -- | -- | -- | 86.3 |
-| A | moncar | **CRASHED** | -- | -- | -- | -- | 119.4 |
+| A | levmar | **CRASHED** | -- | -- | -- | -- | 6.6 |
+| A | neldermead | **CRASHED** | -- | -- | -- | -- | 88.6 |
+| A | moncar | **CRASHED** | -- | -- | -- | -- | 123.7 |
 | B | levmar | True | 76025.9 | 655 | 116.07 | 542 | 4.6 |
 | B | neldermead | True | 1039.9 | 655 | 1.59 | 3990 | 50.5 |
 | B | moncar | False | 1010.7 | 655 | 1.54 | 7000 | 76.6 |
@@ -143,7 +165,7 @@ Converged methods compared: levmar, neldermead
 | D | neldermead | True | 1240.9 | 657 | 1.89 | 3191 | 40.7 |
 | D | moncar | False | 1130.2 | 657 | 1.72 | 5600 | 66.4 |
 
-Stage A crashed for all three optimizers (relxill's C++ code hard-aborts on an unphysical Rout<=Rin excursion, reachable even after the Stage A bound tightening once pileup's extra free parameters are added -- see CLAUDE.md Phase 4). No Stage A result exists for the piled spectrum.
+Stage A crashed for all three optimizers on this spectrum (relxill's C++ code hard-aborts on an unphysical Rout<=Rin excursion). This happens for *both* piled cases -- with jdpileup's extra free parameters (`piled`) and without them (`piled_naive`, same 13 free parameters as `unpiled`, which never crashes) -- so the crash is driven by the piled data's shape itself, not merely by pileup's extra parameters. See CLAUDE.md Phase 4.
 
 ### piled: recovered parameters vs. ground truth, by stage
 
@@ -231,6 +253,117 @@ Converged methods compared: levmar, neldermead
 | a | 19.2% |
 | f | 9.6% |
 
+## Piled spectrum, fit WITHOUT correcting for pileup ("piled_naive")
+
+| Stage | Method | Converged | cstat | dof | reduced stat | nfev | wall time (s) |
+|---|---|---|---|---|---|---|---|
+| A | levmar | **CRASHED** | -- | -- | -- | -- | 6.2 |
+| A | neldermead | **CRASHED** | -- | -- | -- | -- | 37.2 |
+| A | moncar | **CRASHED** | -- | -- | -- | -- | 61.8 |
+| B | levmar | True | 1046.3 | 657 | 1.59 | 559 | 2.8 |
+| B | neldermead | True | 1005.9 | 657 | 1.53 | 3190 | 18.9 |
+| B | moncar | False | 2087.2 | 657 | 3.18 | 5600 | 33.1 |
+| C | levmar | True | 1139.4 | 658 | 1.73 | 230 | 1.3 |
+| C | neldermead | True | 1322.5 | 658 | 2.01 | 2790 | 17.7 |
+| C | moncar | False | 1122.8 | 658 | 1.71 | 4900 | 27.5 |
+| D | levmar | True | 1124.2 | 659 | 1.71 | 201 | 0.9 |
+| D | neldermead | True | 1124.1 | 659 | 1.71 | 2123 | 13.1 |
+| D | moncar | False | 1128.4 | 659 | 1.71 | 4200 | 23.1 |
+
+Stage A crashed for all three optimizers on this spectrum (relxill's C++ code hard-aborts on an unphysical Rout<=Rin excursion). This happens for *both* piled cases -- with jdpileup's extra free parameters (`piled`) and without them (`piled_naive`, same 13 free parameters as `unpiled`, which never crashes) -- so the crash is driven by the piled data's shape itself, not merely by pileup's extra parameters. See CLAUDE.md Phase 4.
+
+### piled_naive: recovered parameters vs. ground truth, by stage
+
+Each table uses that stage's best formally-converged fit (see method column); covar 1-sigma errors turn into `n_sigma` below (not a systematic-bias measure -- see the conf-vs-covar section for why these can be misleadingly tight).
+
+**Stage A**: no fit available (crashed).
+
+**Stage B** (method: neldermead, cstat=1005.9, rstat=1.53):
+
+| Parameter | Fitted | Ground truth | Relative diff | n_sigma (covar) |
+|---|---|---|---|---|
+| spin (a) | 0.876 | 0.493 | 77.7% | -- |
+| Incl (deg) | 31.498 | 30.881 | 2.0% | -- |
+| gamma | 1.227 | 1.331 | -7.8% | -- |
+| logxi | 1.208 | 1.497 | -19.3% | -- |
+| Afe | 2.211 | 2.631 | -16.0% | -- |
+| refl_frac | 33.519 | 14.315 | 134.2% | -- |
+| nH (1e22 cm^-2) | 0.691 | 0.650 | 6.4% | -- |
+
+**Stage C** (method: levmar, cstat=1139.4, rstat=1.73):
+
+| Parameter | Fitted | Ground truth | Relative diff | n_sigma (covar) |
+|---|---|---|---|---|
+| spin (a) | 0.750 | 0.493 | 52.2% | 33.2 |
+| Incl (deg) | 30.103 | 30.881 | -2.5% | -0.4 |
+| gamma | 1.471 | 1.331 | 10.5% | 48.3 |
+| logxi | 0.137 | 1.497 | -90.8% | -- |
+| Afe | (frozen / n/a) | -- | -- | -- |
+| refl_frac | 76.956 | 14.315 | 437.6% | 23.2 |
+| nH (1e22 cm^-2) | 0.662 | 0.650 | 1.8% | 1.3 |
+
+**Stage D** (method: neldermead, cstat=1124.1, rstat=1.71):
+
+| Parameter | Fitted | Ground truth | Relative diff | n_sigma (covar) |
+|---|---|---|---|---|
+| spin (a) | 0.731 | 0.493 | 48.2% | -- |
+| Incl (deg) | (frozen / n/a) | -- | -- | -- |
+| gamma | 1.567 | 1.331 | 17.8% | -- |
+| logxi | 0.000 | 1.497 | -100.0% | -- |
+| Afe | (frozen / n/a) | -- | -- | -- |
+| refl_frac | 112.587 | 14.315 | 686.5% | -- |
+| nH (1e22 cm^-2) | 0.632 | 0.650 | -2.8% | -- |
+
+### piled_naive: cross-method agreement, by stage
+
+Where 2+ methods formally converged in the same (spectrum, stage) group, the spread between their recovered parameter values (as a fraction of the largest value) -- a large spread means the methods landed in *different* minima, not just different precision on the same one.
+
+**Stage A**:
+
+(fewer than 2 converged methods for piled_naive/A; no comparison)
+
+**Stage B**:
+
+Converged methods compared: levmar, neldermead
+
+| Parameter | Max relative spread across methods |
+|---|---|
+| logxi | 49.0% |
+| refl_frac | 45.5% |
+| Afe | 37.1% |
+| gamma | 18.5% |
+| nH | 2.7% |
+| a | 2.3% |
+| Incl | 0.3% |
+| norm | 0.0% |
+
+**Stage C**:
+
+Converged methods compared: levmar, neldermead
+
+| Parameter | Max relative spread across methods |
+|---|---|
+| logxi | 71.8% |
+| refl_frac | 49.9% |
+| gamma | 13.6% |
+| nH | 7.1% |
+| a | 3.6% |
+| Incl | 0.3% |
+| norm | 0.3% |
+
+**Stage D**:
+
+Converged methods compared: levmar, neldermead
+
+| Parameter | Max relative spread across methods |
+|---|---|
+| logxi | 100.0% |
+| refl_frac | 3.0% |
+| nH | 0.5% |
+| gamma | 0.5% |
+| a | 0.1% |
+| norm | 0.0% |
+
 ## conf vs. covar: flagship comparison (Stage B)
 
 Sherpa's `covar` (covariance/Hessian-based, fast) vs. `conf` (profile-likelihood, expensive -- re-optimizes remaining free parameters at each trial value) 1-sigma intervals, for the best-converged Stage B fit of each spectrum.
@@ -267,31 +400,47 @@ Sherpa's `covar` (covariance/Hessian-based, fast) vs. `conf` (profile-likelihood
 | refl_frac | 19.19 | undefined | [-0.7167, +0.249] |
 | norm | 0.01718 | undefined | [-0.01309, +0.01828] |
 
-**Takeaways**: for the unpiled fit, `conf`'s intervals are noticeably larger (and asymmetric) than `covar`'s -- e.g. spin: covar +/-0.00008 vs. conf [-0.0055,+0.0106], refl_frac: covar +/-0.20 vs. conf [-0.69,+0.19] -- `covar`'s linearized/Gaussian approximation is substantially overconfident here. For the piled fit, `covar` failed outright (every bound came back undefined -- the Hessian was singular/hit a parameter boundary during its numerical differencing), while `conf` still produced usable (if boundary-limited on `alpha`, `gamma`, `logxi`) intervals, at a real cost: ~2490s vs. 3s. Concretely: `covar` is cheap and fine as a rough guide on a well-converged fit, but should not be trusted as the final word on parameter uncertainty for a model this nonlinear, and can fail silently-ish (all-`None` bounds) exactly when the fit is least well-behaved -- which is when you'd want it most.
+### piled_naive (method: neldermead, cstat=1005.9, rstat=1.53)
 
-## Pileup bias: unpiled vs. piled, Stage B
+`covar` wall time: 0.6s -- `conf` wall time: 717.7s (1252x slower)
 
-| Parameter | Ground truth | Unpiled fit | Unpiled diff | Piled fit | Piled diff |
-|---|---|---|---|---|---|
-| spin (a) | 0.493 | 0.477 | -3.2% | 0.866 | 75.7% |
-| Incl (deg) | 30.881 | 32.051 | 3.8% | 31.603 | 2.3% |
-| gamma | 1.331 | 1.406 | 5.7% | 1.000 | -24.8% |
-| logxi | 1.497 | 1.007 | -32.7% | 2.301 | 53.8% |
-| Afe | 2.631 | 2.401 | -8.7% | 3.233 | 22.9% |
-| refl_frac | 14.315 | 23.635 | 65.1% | 19.186 | 34.0% |
-| nH (1e22 cm^-2) | 0.650 | 0.587 | -9.6% | 0.694 | 6.9% |
+| Parameter | Best fit | covar 1-sigma | conf 1-sigma |
+|---|---|---|---|
+| nH | 0.6912 | undefined | [-0.03934, +0.01785] |
+| a | 0.876 | undefined | [-0.07157, +0.008982] |
+| Incl | 31.5 | undefined | [-0.9529, +0.8008] |
+| gamma | 1.227 | undefined | [-0.01541, +0.2033] |
+| logxi | 1.208 | undefined | [-1.18, +0.102] |
+| Afe | 2.211 | undefined | [-0.5603, +0.07779] |
+| refl_frac | 33.52 | undefined | [-1.783, +29.53] |
+| norm | 0.0001371 | undefined | [-2.143e-06, +1.722e-06] |
 
-See the exact percentages in the table above rather than this paragraph for specific numbers. Qualitatively: both fits substantially overestimate `refl_frac` relative to truth in the same direction -- likely entangled with the known `norm` convention mismatch (Phase 3) rather than a pileup-specific effect, since it happens on the unpiled side too. Where the piled and unpiled deviations differ in sign or magnitude for a given parameter (check `Afe` and `logxi` above), that is more plausibly a genuine pileup effect: pileup distorts the spectral shape (hardening it, since low-pulse-height piled events get reassigned to higher apparent energies) in a way the `jdpileup` model only partially undoes, and that residual distortion feeds into the line/ionization parameters.
+**Takeaways**: for the unpiled fit, `conf`'s intervals are noticeably larger (and asymmetric) than `covar`'s -- e.g. spin: covar +/-0.00008 vs. conf [-0.0055,+0.0106], refl_frac: covar +/-0.20 vs. conf [-0.69,+0.19] -- `covar`'s linearized/Gaussian approximation is substantially overconfident here. For the piled fit, `covar` failed outright (every bound came back undefined -- the Hessian was singular/hit a parameter boundary during its numerical differencing), while `conf` still produced usable (if boundary-limited on `alpha`, `gamma`, `logxi`) intervals, at a real cost: ~2490s vs. 3s. `covar` failed the same way on `piled_naive` (again all bounds undefined), and `conf` there is even slower relative to `covar` (~1252x) and produces a strikingly asymmetric `refl_frac` interval ([-1.78, +29.5]) -- a large, lopsided uncertainty that is itself a symptom of just how poorly determined that parameter is once pileup goes uncorrected. Concretely: `covar` is cheap and fine as a rough guide on a well-converged fit, but should not be trusted as the final word on parameter uncertainty for a model this nonlinear, and can fail silently-ish (all-`None` bounds) exactly when the fit is least well-behaved -- which is when you'd want it most.
 
-## Diagnostic plots (Stage B best fit)
+## Interpretation: does correcting for pileup actually help?
+
+Referring back to the headline three-way table above:
+
+- **Fit quality alone cannot tell you whether pileup was handled correctly.** `piled_naive`'s best Stage B fit (cstat~1005.9, rstat~1.53) is statistically *at least as good as*, if not marginally better than, the jdpileup-corrected `piled` fit (cstat~1039.9, rstat~1.59) -- despite `piled_naive` using the structurally wrong model. `relxill`'s own free parameters (`refl_frac` especially -- see below) are flexible enough to partially absorb pileup's spectral distortion and produce an equally clean-looking fit to the wrong physical picture. The diagnostic plots below show this directly: the naive fit *looks* just as good as the corrected one.
+- **Spin is severely biased high in *both* piled cases, corrected or not.** `piled` and `piled_naive` recover spin within a few percent of *each other*, but both are biased roughly 75-78% high relative to the unpiled fit's close-to-truth ~-3%. On this evidence, `jdpileup` correction does essentially nothing to rescue the spin measurement for this source/pileup level -- a materially important caveat for anyone using `relxill` on a pileup-corrected Chandra spectrum to measure spin.
+- **`refl_frac` is the clearest single tracer of *whether* pileup was corrected for, even though it doesn't track spin's bias.** It's biased high in all three cases (again likely entangled with the known `norm` convention mismatch, Phase 3), but far more extremely in the uncorrected `piled_naive` fit (+134%) than in either the corrected `piled` fit (+34%) or the `unpiled` fit (+65%) -- consistent with the fit inflating reflection fraction to compensate for the flux jdpileup would otherwise have accounted for.
+- **Inclination and nH are comparatively robust** across all three cases (within ~2-9% of truth everywhere) -- not everything is equally vulnerable to pileup.
+- **gamma and logxi are, perhaps counterintuitively, *closer* to the unpiled fit's bias in the uncorrected `piled_naive` fit than in the jdpileup-corrected `piled` fit** (see the table). This doesn't mean skipping the pileup correction is a good idea -- the fit quality argument above and the badly-biased spin and refl_frac values say otherwise -- but it's a reminder that "correcting" for an instrumental effect with an imperfect model does not uniformly move every parameter closer to the truth.
+
+## Diagnostic plots (Stage B best fit, all three cases)
 
 ![unpiled Stage B fit](plots/unpiled_stageB_fit.png)
 
-![piled Stage B fit](plots/piled_stageB_fit.png)
+![piled Stage B fit (jdpileup-corrected)](plots/piled_stageB_fit.png)
+
+![piled_naive Stage B fit (uncorrected)](plots/piled_naive_stageB_fit.png)
+
+Note how visually similar the `piled` and `piled_naive` fits are -- this is the same point made above: you cannot tell from the fit residuals alone whether pileup was actually corrected for.
 
 ## Caveats carried through from earlier phases
 
 - `norm` is not directly comparable to the ground-truth CSV value (see above) -- a ~50x uniform flux-scale mismatch found in Phase 3, cause not fully diagnosed.
 - Pileup's `ftime`/`fracexp`/`g0`/`n`/`nterms` were left at Sherpa's instrumental defaults (no real event-file header available for this simulation) -- only `alpha` and `f` were fit.
 - `nH` units assumed to be the tbabs-standard 1e22 cm^-2 (not explicitly stated in the index CSV) -- still an open question for the user.
+- `build_piled_naive_model()` explicitly deletes any pileup model already attached to the piled dataset before setting its plain source model -- Sherpa keeps a dataset's pileup model separate from its source model, so building the corrected (`piled`) and uncorrected (`piled_naive`) models in the same session without this would silently leave the old jdpileup wrap active underneath the "uncorrected" fit. Hit this exactly once while making the diagnostic plots (fixed before any numbers here were generated -- the fit grid itself was never affected, since each combination runs in its own fresh subprocess).
 - Stage A's `Rin`/`Rout` bounds were tightened from relxill's native range for numerical-stability reasons (see Phase 3/4) -- Stage A results should be read as "free within a still-very-wide but slightly conservative range", not "free over relxill's full native range".

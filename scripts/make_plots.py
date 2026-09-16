@@ -16,7 +16,9 @@ import matplotlib.pyplot as plt
 from sherpa.astro import ui
 
 from load_data import setup_data
-from build_models import build_unpiled_model, build_piled_model
+from build_models import (
+    build_unpiled_model, build_piled_model, build_piled_naive_model,
+)
 
 ROOT = Path(__file__).resolve().parent.parent
 RESULTS = ROOT / "results"
@@ -24,7 +26,9 @@ PLOTS_DIR = RESULTS / "plots"
 PLOTS_DIR.mkdir(exist_ok=True)
 
 STAGE = "B"
-FLAGSHIP = {"unpiled": "levmar", "piled": "neldermead"}  # see analysis_summary.json
+# see analysis_summary.json's best_per_group -> best_succeeded
+FLAGSHIP = {"unpiled": "levmar", "piled": "neldermead",
+            "piled_naive": "neldermead"}
 
 
 def set_params_from_record(models, record):
@@ -92,6 +96,10 @@ def main():
     abs_p, rel_p, pmod_p = build_piled_model(id_piled, STAGE)
     rec_p = load_record("piled", STAGE, FLAGSHIP["piled"])
     plot_one("piled", id_piled, [abs_p, rel_p, pmod_p], rec_p)
+
+    abs_pn, rel_pn = build_piled_naive_model(id_piled, STAGE)
+    rec_pn = load_record("piled_naive", STAGE, FLAGSHIP["piled_naive"])
+    plot_one("piled_naive", id_piled, [abs_pn, rel_pn], rec_pn)
 
 
 if __name__ == "__main__":

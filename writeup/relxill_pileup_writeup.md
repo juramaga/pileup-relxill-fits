@@ -2,8 +2,10 @@
 
 *A didactic walkthrough of fitting a MARX-simulated Chandra spectrum with
 `relxill` in Sherpa, with and without photon pileup, comparing optimizers
-and freezing strategies. Companion documents: `CLAUDE.md` (full decision
-log and methodology, Phases 1-5), `results/report.md` (the complete numeric
+and freezing strategies, and — the centerpiece of this update — comparing
+what happens when pileup is properly corrected for versus silently
+ignored. Companion documents: `CLAUDE.md` (full decision log and
+methodology, Phases 1-5), `results/report.md` (the complete numeric
 fit-metrics report), `notebook/relxill_pileup_fitting.ipynb` (a runnable
 walkthrough).*
 
@@ -118,21 +120,32 @@ freely over `relxill`'s full native parameter ranges — see Section 6.
 
 ## 4. Model setup
 
-For each spectrum, the source model is `tbabs * relxill` (interstellar
-absorption times the reflection model). The piled spectrum additionally
-wraps this in Sherpa's `jdpileup` model (implementing the Davis 2001
-ACIS pileup algorithm), inserted by Sherpa between the source model and
-the RMF — physically correct, since pileup is a focal-plane effect that
-happens before the detector's energy redistribution, not after. Of
-`jdpileup`'s parameters, `alpha` (the probability that a piled event
-survives Chandra's onboard grade filter as a "good" event) and `f` (the
-fraction of the source's PSF falling inside the extraction region, which
-controls how much of the flux is even subject to pileup) were left free to
-fit; the frame time, exposure fraction, and a couple of other parameters
-were left at Sherpa's standard ACIS defaults, since no real event-file
-header exists for this simulation to read them from — a modeling
-assumption worth remembering when judging the piled fit's absolute
-accuracy.
+Three model/spectrum cases are fit and compared throughout this project:
+
+1. **`unpiled`** — the pileup-free spectrum, fit with `tbabs * relxill`
+   (interstellar absorption times the reflection model).
+2. **`piled`** — the pileup-affected spectrum, with the same source model
+   additionally wrapped in Sherpa's `jdpileup` model (implementing the
+   Davis 2001 ACIS pileup algorithm), inserted by Sherpa between the
+   source model and the RMF — physically correct, since pileup is a
+   focal-plane effect that happens before the detector's energy
+   redistribution, not after. Of `jdpileup`'s parameters, `alpha` (the
+   probability that a piled event survives Chandra's onboard grade filter
+   as a "good" event) and `f` (the fraction of the source's PSF falling
+   inside the extraction region, which controls how much of the flux is
+   even subject to pileup) were left free to fit; the frame time, exposure
+   fraction, and a couple of other parameters were left at Sherpa's
+   standard ACIS defaults, since no real event-file header exists for this
+   simulation to read them from — a modeling assumption worth remembering
+   when judging this fit's absolute accuracy.
+3. **`piled_naive`** — the *same* pileup-affected data as `piled`, fit with
+   the plain, unpiled-style `tbabs * relxill` model and **no** pileup
+   correction at all. This third case represents the mistake an analyst
+   makes by not realizing (or not bothering to correct for) pileup, and
+   was added specifically to answer a question the first two cases alone
+   can't: *how much does correcting for pileup actually change the
+   science conclusions, versus just ignoring it?* Section 5.6 has the
+   answer, and it is more sobering than one might hope.
 
 ### The parameter-freezing ladder
 
@@ -203,10 +216,11 @@ what's actually being measured):
 
 ## 5. Results
 
-The complete numeric results for all 24 (spectrum x stage x method)
-combinations are in `results/report.md` and `results/fit_metrics.csv`;
-this section pulls out the findings that actually matter for interpreting
-the science, and for anyone repeating an analysis like this one.
+The complete numeric results for all 36 (spectrum/model-case x stage x
+method) combinations are in `results/report.md` and
+`results/fit_metrics.csv`; this section pulls out the findings that
+actually matter for interpreting the science, and for anyone repeating an
+analysis like this one.
 
 ### 5.1 The freezing ladder doesn't just reduce parameters — it can help or hurt
 
@@ -246,28 +260,48 @@ reliable on it. A pileup analysis that only tries `levmar` and reports
 convergence is not, on this evidence, safe to trust without a
 cross-check from a derivative-free or global method.
 
-### 5.3 Stage A is not just poorly constrained for the piled spectrum — it's uncomputable
+This is corroborated directly by the third (`piled_naive`) case: fitting
+the *same* piled data with `jdpileup` removed, `levmar` no longer gets
+stuck (Stage B: cstat~1046, essentially tied with `neldermead`'s ~1006) —
+it's specifically the combination of piled data *and* `jdpileup`'s own
+nonlinear machinery that trips up the gradient method, not the piled data
+on its own.
+
+### 5.3 Stage A is not just poorly constrained for the piled spectrum — it's uncomputable, regardless of whether pileup is even in the model
 
 All three optimizers *crashed* — not converged poorly, actually crashed the
-Python process — when given the piled spectrum's full 15-parameter Stage A
-freedom (13 `relxill` parameters plus pileup's `alpha` and `f`). This
-traces back to the hard-abort behavior described in Section 3: with
+Python process — when given the piled spectrum's full Stage A freedom.
+This traces back to the hard-abort behavior described in Section 3: with
 `relxill`'s native `Rin` range (equivalent to 1x-100x the ISCO radius) and
-`Rout` range (1-1000 gravitational radii) both fully open, and pileup
-adding yet more freedom to the fit, all three optimizers eventually sampled
-a combination where the sentinel-encoded inner radius exceeded the outer
-radius, and the whole process died rather than the fit merely failing.
-Tightening those bounds (still leaving both genuinely free over a
-physically generous sub-range — nobody fits `Rin` beyond ~10x the ISCO or
-`Rout` below ~120 gravitational radii in practice) was enough to prevent
-this on the *unpiled* side, but not once pileup's extra dimensions were
-added on top. The actual, load-bearing fix was running each fit in its own
-subprocess, so one combination's crash doesn't take the rest of the run
-down with it (see `CLAUDE.md` Phase 4) — but the crash itself is a genuine
-result: for this pileup-affected spectrum, "just let everything float" is
-not merely bad practice, it's not something these optimizers can even
-complete. That's about as concrete an argument for the progressive
-freezing approach as this project produced.
+`Rout` range (1-1000 gravitational radii) both fully open, all three
+optimizers eventually sampled a combination where the sentinel-encoded
+inner radius exceeded the outer radius, and the whole process died rather
+than the fit merely failing. Tightening those bounds (still leaving both
+genuinely free over a physically generous sub-range — nobody fits `Rin`
+beyond ~10x the ISCO or `Rout` below ~120 gravitational radii in practice)
+was enough to prevent this on the *unpiled* side, but not on the piled
+side.
+
+The original version of this analysis (before the `piled_naive` case was
+added) attributed this to `jdpileup`'s extra free parameters (`alpha`,
+`f`) pushing the fit into a larger, more dangerous parameter space. That
+turned out to be an incomplete explanation: `piled_naive` has exactly the
+same 13 free parameters as `unpiled` at Stage A (no pileup parameters at
+all), and it crashes too, on all three optimizers, on the same piled data.
+The correct generalization is that **the piled data's own shape** — not
+the pileup *model's* extra parameters — is what sends the same
+13-parameter Stage A search into `Rout <= Rin` territory that the unpiled
+data never reaches from the same starting point and bounds. The actual,
+load-bearing fix was running each fit in its own subprocess, so one
+combination's crash doesn't take the rest of the run down with it (see
+`CLAUDE.md` Phase 4) — but the crash itself is a genuine, and now better
+understood, result: for this fainter, differently-shaped spectrum, "just
+let everything float" is not merely bad practice, it's not something these
+optimizers can even complete, with or without pileup in the model. That's
+about as concrete an argument for the progressive freezing approach as
+this project produced — and a caution against assuming a fully-free fit
+that worked on one spectrum will work on a different one, even a
+nominally similar-looking spectrum of the same source.
 
 ### 5.4 Formal parameter uncertainties are not a substitute for checking against truth
 
@@ -284,7 +318,12 @@ undefined bound, because the numerical Hessian estimate hit a parameter
 boundary or was otherwise singular, even though the fit itself had
 converged to a good, physically reasonable answer. `conf` still worked
 there, but at real cost — about 2490 seconds versus 3 for `covar`, roughly
-an 800x difference, for a 10-parameter model.
+an 800x difference, for a 10-parameter model. `piled_naive`'s Stage B fit
+shows the identical pattern (`covar` all-undefined, `conf` ~1250x slower
+than `covar` but usable) and produces a strikingly asymmetric `refl_frac`
+interval, [-1.78, +29.5] — a lopsided uncertainty that is itself a symptom
+of just how poorly determined that parameter is once pileup goes
+uncorrected.
 
 There's a second, easy-to-miss trap hiding in the ground-truth comparison
 table (`results/report.md`): several formally well-converged fits report
@@ -327,32 +366,86 @@ see `CLAUDE.md` Phase 3). `refl_frac`'s definition in `relxill` is itself
 tied to that same normalization, so its bias should be read with that
 caveat attached, not taken as a clean measurement of a real degeneracy.
 
-Comparing piled and unpiled recovered values directly against each other
-(not just each against truth) is instructive: spin, inclination, and the
-absorbing column come out close to each other between the two spectra
-(within a few percent), suggesting `jdpileup` is doing a reasonable job of
-undoing pileup's effect on those. Photon index, ionization, and iron
-abundance diverge more between the piled and unpiled fits than either does
-from the truth on its own — the more plausible interpretation is that this
-reflects a genuine, only partially corrected pileup-driven spectral
-hardening (piled events preferentially harden the observed continuum
-shape, and the fit compensates by shifting continuum/ionization
-parameters) rather than pure statistical scatter, given both fits have
-enormous count numbers. Full numbers: `results/report.md`, section "Pileup
-bias: unpiled vs. piled, Stage B".
+Section 5.6 below extends this comparison with the third (`piled_naive`)
+case, which is where the more striking findings are.
+
+### 5.6 Does correcting for pileup with jdpileup actually help? A three-way comparison
+
+This is the comparison this project was extended to make, and the
+headline numbers are worth putting side by side (all Stage B, each case's
+own best formally-converged fit; full table in `results/report.md`):
+
+| Parameter | Ground truth | `unpiled` | `piled` (corrected) | `piled_naive` (uncorrected) |
+|---|---|---|---|---|
+| spin (`a`) | 0.493 | 0.477 (-3.2%) | 0.866 (+75.7%) | 0.876 (+77.7%) |
+| Incl (deg) | 30.88 | 32.05 (+3.8%) | 31.60 (+2.3%) | 31.50 (+2.0%) |
+| `gamma` | 1.331 | 1.406 (+5.7%) | 1.000 (-24.8%) | 1.227 (-7.8%) |
+| `logxi` | 1.497 | 1.007 (-32.7%) | 2.301 (+53.8%) | 1.208 (-19.3%) |
+| `Afe` | 2.631 | 2.401 (-8.7%) | 3.233 (+22.9%) | 2.211 (-16.0%) |
+| `refl_frac` | 14.315 | 23.64 (+65.1%) | 19.19 (+34.0%) | 33.52 (+134.2%) |
+| `nH` | 0.650 | 0.587 (-9.6%) | 0.694 (+6.9%) | 0.691 (+6.4%) |
+
+Four findings jump out, and not all of them are comfortable ones:
+
+**A good fit statistic does not tell you whether pileup was handled
+correctly.** `piled_naive`'s best Stage B fit (cstat~1005.9, reduced
+stat~1.53) is statistically at least as good as — arguably marginally
+better than — the properly `jdpileup`-corrected `piled` fit (cstat~1039.9,
+reduced stat~1.59), despite using the structurally wrong model. Figure
+comparison in Section 6 shows why: the two fits are visually
+indistinguishable. `relxill` has enough free parameters (`refl_frac`
+especially) to partially absorb pileup's spectral distortion and produce
+an equally clean-looking fit to physically wrong parameter values. If the
+only check available is "does the fit look good and is reduced stat
+reasonable," this project would have no way to tell that the
+`piled_naive` fit is any less trustworthy than the properly-corrected one.
+
+**Correcting for pileup does not rescue the spin measurement, at least not
+here.** Spin comes out biased ~76-78% high in *both* piled cases —
+corrected and uncorrected alike — while the unpiled fit is within a few
+percent of truth. Whatever `jdpileup` is doing to compensate for pileup's
+effect on the overall spectral shape, it is not fixing whatever is driving
+the spin measurement so far off. This is arguably the most important
+result of the whole exercise for anyone using `relxill` on a Chandra
+spectrum with any meaningful pileup: don't assume that adding `jdpileup`
+to the model is sufficient to trust the recovered spin.
+
+**`refl_frac` is the parameter most sensitive to *whether* pileup was
+corrected for, even though it doesn't track spin's failure mode.** It's
+biased high in all three cases (entangled with the `norm`
+scale-convention issue from Section 5.5/`CLAUDE.md` Phase 3), but far more
+extremely so when pileup is left uncorrected (+134% vs. +34% corrected vs.
++65% unpiled) — consistent with the fit inflating reflection fraction to
+make up for flux that `jdpileup` would otherwise have properly accounted
+for. In a real analysis without ground truth to check against, an
+implausibly large `refl_frac` (well above the physically expected ceiling
+of ~a few for a simple lamp-post-like geometry) is a plausible warning
+sign that pileup hasn't been handled.
+
+**Not every parameter gets worse without correction — `gamma` and
+`logxi` are actually closer to the unpiled fit's own bias in the
+*uncorrected* fit than in the corrected one.** This is not an argument for
+skipping pileup correction (the fit-quality and spin points above say
+otherwise, strongly) — it's a reminder that "correcting" an instrumental
+effect with an imperfect model doesn't move every downstream parameter
+uniformly closer to the truth, and a partial correction can occasionally
+overshoot on some parameters while undershooting on others.
 
 ## 6. Visual check
 
-Both Stage B fits are visually good across most of the 0.3-10 keV band —
-data/model ratios within a few percent through the bulk of the spectrum,
-widening toward the low-count edges of the band — despite reduced
-statistics well above 1 in both cases, for exactly the reason discussed in
-Section 5.4: with millions of counts, `cstat` is sensitive enough to flag
-even a few-percent systematic mismatch as statistically significant. See
-`results/plots/unpiled_stageB_fit.png` and
-`results/plots/piled_stageB_fit.png` (also reproduced live in the
-notebook), including a visible instrumental dip near ~2.3 keV that both
-fits track reasonably well.
+All three Stage B fits are visually good across most of the 0.3-10 keV
+band — data/model ratios within a few percent through the bulk of the
+spectrum, widening toward the low-count edges of the band — despite
+reduced statistics well above 1 in every case, for exactly the reason
+discussed in Section 5.4: with millions of counts, `cstat` is sensitive
+enough to flag even a few-percent systematic mismatch as statistically
+significant. See `results/plots/unpiled_stageB_fit.png`,
+`results/plots/piled_stageB_fit.png`, and
+`results/plots/piled_naive_stageB_fit.png` (all three reproduced live,
+side by side, in the notebook), including a visible instrumental dip near
+~2.3 keV that all three fits track reasonably well. As Section 5.6
+discusses, the `piled` and `piled_naive` panels are essentially
+indistinguishable by eye — the whole point of that comparison.
 
 ## 7. Takeaways for reproducing or extending this analysis
 
@@ -378,3 +471,21 @@ fits track reasonably well.
   simplifications one at a time) surfaces failure modes — a wrong "typical"
   assumption, a numerically intractable fully-free fit — that jumping
   straight to a final, fully-constrained model would have hidden.
+- **When feasible, deliberately fit the uncorrected model alongside the
+  corrected one.** A good `cstat`/reduced-stat value on a pileup-corrected
+  fit is not, by itself, evidence that the correction worked — this
+  project's `piled_naive` control fit was statistically indistinguishable
+  from the properly-corrected fit while being severely biased in spin and
+  reflection fraction. Where an independent constraint (ground truth here;
+  in practice, a lower-pileup epoch of the same source, a different
+  instrument, or a physically-motivated prior) is available, use it to
+  check the corrected fit rather than trusting the correction on faith.
+- Watch for state that persists across model rebuilds within a single
+  Sherpa session — `set_pileup_model()` attaches to the *dataset*, not the
+  source model, and survives a later `set_source()` call. Building an
+  uncorrected control model in the same session as a pileup-corrected one
+  (exactly the comparison recommended above) will silently produce the
+  wrong result unless the old pileup model is explicitly deleted first
+  (`delete_pileup_model()`) — this project hit that bug once, while making
+  the diagnostic plots, before catching it from an implausible-looking
+  ratio plot.

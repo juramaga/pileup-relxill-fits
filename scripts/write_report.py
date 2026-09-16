@@ -14,6 +14,13 @@ RESULTS = ROOT / "results"
 
 STAGES = ["A", "B", "C", "D"]
 METHODS = ["levmar", "neldermead", "moncar"]
+SPECTRA = ["unpiled", "piled", "piled_naive"]
+SPECTRUM_TITLES = {
+    "unpiled": "## Unpiled spectrum",
+    "piled": "## Piled spectrum (jdpileup-corrected)",
+    "piled_naive": "## Piled spectrum, fit WITHOUT correcting for pileup "
+                   "(\"piled_naive\")",
+}
 STAGE_DESC = {
     "A": "all thawed (except z=0)",
     "B": "standard freeze (Rin=-1 ISCO, Rout=400, single emissivity, "
@@ -100,6 +107,24 @@ def agreement_table(agreement, key):
     return "\n".join(rows)
 
 
+def three_way_table(gtc, ground_truth):
+    gt_key_map = {"a": "spin", "Incl": "incl"}
+    rows = ["| Parameter | Ground truth | unpiled | piled (corrected) | "
+            "piled_naive (uncorrected) |",
+            "|---|---|---|---|---|"]
+    entries = {s: gtc.get(f"{s}/B", {}).get("comparison", {}) for s in SPECTRA}
+    for short, label in GT_LABELS.items():
+        truth = ground_truth.get(gt_key_map.get(short, short))
+        cells = []
+        for s in SPECTRA:
+            c = entries[s].get(short)
+            cells.append(f"{fmt(c['fitted'])} ({fmt(c['rel_diff_pct'],1)}%)"
+                         if c else "--")
+        rows.append(f"| {label} | {fmt(truth)} | {cells[0]} | {cells[1]} | "
+                     f"{cells[2]} |")
+    return "\n".join(rows)
+
+
 def conf_vs_covar_table(flag):
     rows = ["| Parameter | Best fit | covar 1-sigma | conf 1-sigma |",
             "|---|---|---|---|"]
@@ -160,19 +185,56 @@ def main():
         lines.append(f"- **Stage {s}**: {STAGE_DESC[s]}")
     lines.append("")
 
-    for spectrum, title in [("unpiled", "## Unpiled spectrum"),
-                              ("piled", "## Piled (pileup-affected) spectrum")]:
+    lines.append("## Three spectrum/model cases compared")
+    lines.append("")
+    lines.append("- **unpiled**: the pileup-free spectrum, fit with "
+                  "`tbabs*relxill`.")
+    lines.append("- **piled**: the pileup-affected spectrum, fit with "
+                  "`tbabs*relxill` wrapped in Sherpa's `jdpileup` model -- "
+                  "the physically correct treatment.")
+    lines.append("- **piled_naive**: the *same* pileup-affected spectrum, "
+                  "fit with plain `tbabs*relxill` and **no** pileup "
+                  "correction at all -- the mistake an analyst makes by "
+                  "not realizing/correcting for pileup. Added specifically "
+                  "to quantify how much parameter bias pileup causes "
+                  "*with* vs. *without* correcting for it (see the "
+                  "three-way comparison immediately below).")
+    lines.append("")
+
+    lines.append("## Headline result: Stage B, all three cases vs. ground truth")
+    lines.append("")
+    lines.append("This is the comparison of primary interest -- the "
+                  "literature-standard freezing stage, for all three "
+                  "spectrum/model cases, each using its own best "
+                  "formally-converged method.")
+    lines.append("")
+    lines.append(three_way_table(gtc, ground_truth))
+    lines.append("")
+    lines.append("**Read this as**: `unpiled` is the baseline (pileup-free, "
+                  "closest to a \"clean\" measurement); `piled` shows what "
+                  "you get *after* correcting for pileup with `jdpileup`; "
+                  "`piled_naive` shows what you'd get if you fit the exact "
+                  "same pileup-affected data *without* realizing/correcting "
+                  "for pileup. See \"Interpretation\" after the table.")
+    lines.append("")
+
+    for spectrum in SPECTRA:
+        title = SPECTRUM_TITLES[spectrum]
         lines.append(title)
         lines.append("")
         lines.append(stage_method_table(records, spectrum))
         lines.append("")
-        if spectrum == "piled":
-            lines.append("Stage A crashed for all three optimizers (relxill's "
-                          "C++ code hard-aborts on an unphysical Rout<=Rin "
-                          "excursion, reachable even after the Stage A bound "
-                          "tightening once pileup's extra free parameters are "
-                          "added -- see CLAUDE.md Phase 4). No Stage A result "
-                          "exists for the piled spectrum.")
+        if spectrum in ("piled", "piled_naive"):
+            lines.append("Stage A crashed for all three optimizers on this "
+                          "spectrum (relxill's C++ code hard-aborts on an "
+                          "unphysical Rout<=Rin excursion). This happens "
+                          "for *both* piled cases -- with jdpileup's extra "
+                          "free parameters (`piled`) and without them "
+                          "(`piled_naive`, same 13 free parameters as "
+                          "`unpiled`, which never crashes) -- so the crash "
+                          "is driven by the piled data's shape itself, not "
+                          "merely by pileup's extra parameters. See "
+                          "CLAUDE.md Phase 4.")
             lines.append("")
 
         lines.append(f"### {spectrum}: recovered parameters vs. ground truth, "
@@ -227,7 +289,7 @@ def main():
                   "intervals, for the best-converged Stage B fit of each "
                   "spectrum.")
     lines.append("")
-    for spectrum in ("unpiled", "piled"):
+    for spectrum in SPECTRA:
         flag = conf_flag[spectrum]
         lines.append(f"### {spectrum} (method: {flag['method']}, "
                       f"cstat={flag['statval']:.1f}, "
@@ -250,7 +312,14 @@ def main():
                   "during its numerical differencing), while `conf` still "
                   "produced usable (if boundary-limited on `alpha`, `gamma`, "
                   "`logxi`) intervals, at a real cost: ~2490s vs. 3s. "
-                  "Concretely: `covar` is cheap and fine as a rough guide on "
+                  "`covar` failed the same way on `piled_naive` (again all "
+                  "bounds undefined), and `conf` there is even slower "
+                  "relative to `covar` (~1252x) and produces a strikingly "
+                  "asymmetric `refl_frac` interval ([-1.78, +29.5]) -- a "
+                  "large, lopsided uncertainty that is itself a symptom of "
+                  "just how poorly determined that parameter is once "
+                  "pileup goes uncorrected. Concretely: `covar` is cheap "
+                  "and fine as a rough guide on "
                   "a well-converged fit, but should not be trusted as the "
                   "final word on parameter uncertainty for a model this "
                   "nonlinear, and can fail silently-ish (all-`None` bounds) "
@@ -258,43 +327,71 @@ def main():
                   "when you'd want it most.")
     lines.append("")
 
-    lines.append("## Pileup bias: unpiled vs. piled, Stage B")
+    lines.append("## Interpretation: does correcting for pileup actually help?")
     lines.append("")
-    u = gtc.get("unpiled/B", {}).get("comparison", {})
-    p = gtc.get("piled/B", {}).get("comparison", {})
-    lines.append("| Parameter | Ground truth | Unpiled fit | Unpiled diff | "
-                  "Piled fit | Piled diff |")
-    lines.append("|---|---|---|---|---|---|")
-    for short, label in GT_LABELS.items():
-        cu, cp = u.get(short), p.get(short)
-        truth = ground_truth.get({"a": "spin", "Incl": "incl"}.get(short, short))
-        fu = fmt(cu["fitted"]) if cu else "--"
-        du = f"{fmt(cu['rel_diff_pct'],1)}%" if cu else "--"
-        fp = fmt(cp["fitted"]) if cp else "--"
-        dp = f"{fmt(cp['rel_diff_pct'],1)}%" if cp else "--"
-        lines.append(f"| {label} | {fmt(truth)} | {fu} | {du} | {fp} | {dp} |")
+    lines.append("Referring back to the headline three-way table above:")
     lines.append("")
-    lines.append("See the exact percentages in the table above rather than "
-                  "this paragraph for specific numbers. Qualitatively: both "
-                  "fits substantially overestimate `refl_frac` relative to "
-                  "truth in the same direction -- likely entangled with the "
-                  "known `norm` convention mismatch (Phase 3) rather than a "
-                  "pileup-specific effect, since it happens on the unpiled "
-                  "side too. Where the piled and unpiled deviations differ "
-                  "in sign or magnitude for a given parameter (check `Afe` "
-                  "and `logxi` above), that is more plausibly a genuine "
-                  "pileup effect: pileup distorts the spectral shape "
-                  "(hardening it, since low-pulse-height piled events get "
-                  "reassigned to higher apparent energies) in a way the "
-                  "`jdpileup` model only partially undoes, and that residual "
-                  "distortion feeds into the line/ionization parameters.")
+    lines.append("- **Fit quality alone cannot tell you whether pileup was "
+                  "handled correctly.** `piled_naive`'s best Stage B fit "
+                  "(cstat~1005.9, rstat~1.53) is statistically *at least as "
+                  "good as*, if not marginally better than, the "
+                  "jdpileup-corrected `piled` fit (cstat~1039.9, "
+                  "rstat~1.59) -- despite `piled_naive` using the "
+                  "structurally wrong model. `relxill`'s own free "
+                  "parameters (`refl_frac` especially -- see below) are "
+                  "flexible enough to partially absorb pileup's spectral "
+                  "distortion and produce an equally clean-looking fit "
+                  "to the wrong physical picture. The diagnostic plots "
+                  "below show this directly: the naive fit *looks* just "
+                  "as good as the corrected one.")
+    lines.append("- **Spin is severely biased high in *both* piled cases, "
+                  "corrected or not.** `piled` and `piled_naive` recover "
+                  "spin within a few percent of *each other*, but both are "
+                  "biased roughly 75-78% high relative to the unpiled fit's "
+                  "close-to-truth ~-3%. On this evidence, `jdpileup` "
+                  "correction does essentially nothing to rescue the spin "
+                  "measurement for this source/pileup level -- a materially "
+                  "important caveat for anyone using `relxill` on a "
+                  "pileup-corrected Chandra spectrum to measure spin.")
+    lines.append("- **`refl_frac` is the clearest single tracer of *whether* "
+                  "pileup was corrected for, even though it doesn't track "
+                  "spin's bias.** It's biased high in all three cases "
+                  "(again likely entangled with the known `norm` "
+                  "convention mismatch, Phase 3), but far more extremely in "
+                  "the uncorrected `piled_naive` fit (+134%) than in either "
+                  "the corrected `piled` fit (+34%) or the `unpiled` fit "
+                  "(+65%) -- consistent with the fit inflating reflection "
+                  "fraction to compensate for the flux jdpileup would "
+                  "otherwise have accounted for.")
+    lines.append("- **Inclination and nH are comparatively robust** across "
+                  "all three cases (within ~2-9% of truth everywhere) -- "
+                  "not everything is equally vulnerable to pileup.")
+    lines.append("- **gamma and logxi are, perhaps counterintuitively, "
+                  "*closer* to the unpiled fit's bias in the uncorrected "
+                  "`piled_naive` fit than in the jdpileup-corrected `piled` "
+                  "fit** (see the table). This doesn't mean skipping the "
+                  "pileup correction is a good idea -- the fit quality "
+                  "argument above and the badly-biased spin and refl_frac "
+                  "values say otherwise -- but it's a reminder that "
+                  "\"correcting\" for an instrumental effect with an "
+                  "imperfect model does not uniformly move every parameter "
+                  "closer to the truth.")
     lines.append("")
 
-    lines.append("## Diagnostic plots (Stage B best fit)")
+    lines.append("## Diagnostic plots (Stage B best fit, all three cases)")
     lines.append("")
     lines.append("![unpiled Stage B fit](plots/unpiled_stageB_fit.png)")
     lines.append("")
-    lines.append("![piled Stage B fit](plots/piled_stageB_fit.png)")
+    lines.append("![piled Stage B fit (jdpileup-corrected)]"
+                  "(plots/piled_stageB_fit.png)")
+    lines.append("")
+    lines.append("![piled_naive Stage B fit (uncorrected)]"
+                  "(plots/piled_naive_stageB_fit.png)")
+    lines.append("")
+    lines.append("Note how visually similar the `piled` and `piled_naive` "
+                  "fits are -- this is the same point made above: you "
+                  "cannot tell from the fit residuals alone whether pileup "
+                  "was actually corrected for.")
     lines.append("")
 
     lines.append("## Caveats carried through from earlier phases")
@@ -309,6 +406,18 @@ def main():
     lines.append("- `nH` units assumed to be the tbabs-standard 1e22 cm^-2 "
                   "(not explicitly stated in the index CSV) -- still an open "
                   "question for the user.")
+    lines.append("- `build_piled_naive_model()` explicitly deletes any "
+                  "pileup model already attached to the piled dataset "
+                  "before setting its plain source model -- Sherpa keeps a "
+                  "dataset's pileup model separate from its source model, "
+                  "so building the corrected (`piled`) and uncorrected "
+                  "(`piled_naive`) models in the same session without this "
+                  "would silently leave the old jdpileup wrap active "
+                  "underneath the \"uncorrected\" fit. Hit this exactly "
+                  "once while making the diagnostic plots (fixed before "
+                  "any numbers here were generated -- the fit grid itself "
+                  "was never affected, since each combination runs in its "
+                  "own fresh subprocess).")
     lines.append("- Stage A's `Rin`/`Rout` bounds were tightened from "
                   "relxill's native range for numerical-stability reasons "
                   "(see Phase 3/4) -- Stage A results should be read as "

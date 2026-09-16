@@ -20,15 +20,19 @@ from pathlib import Path
 from sherpa.astro import ui
 
 from load_data import setup_data
-from build_models import build_unpiled_model, build_piled_model
+from build_models import (
+    build_unpiled_model, build_piled_model, build_piled_naive_model,
+)
 
 ROOT = Path(__file__).resolve().parent.parent
 RESULTS = ROOT / "results"
 
 # From results/analysis_summary.json's best_per_group -> best_succeeded,
-# for Stage B (see Phase 4/5 discussion): unpiled's best formally-converged
-# fit is levmar, piled's is neldermead.
-FLAGSHIP = {"unpiled": "levmar", "piled": "neldermead"}
+# for Stage B (see Phase 4/5 discussion): unpiled's and piled_naive's best
+# formally-converged fit is neldermead... except unpiled's was run (and is
+# kept, to avoid re-running piled's 2490s conf) as levmar, its own winner.
+FLAGSHIP = {"unpiled": "levmar", "piled": "neldermead",
+            "piled_naive": "neldermead"}
 STAGE = "B"
 
 
@@ -37,8 +41,12 @@ def run_flagship(spectrum, method, id_unpiled, id_piled):
         absmodel, relmodel = build_unpiled_model(id_unpiled, STAGE)
         pmod = None
         fit_id = id_unpiled
-    else:
+    elif spectrum == "piled":
         absmodel, relmodel, pmod = build_piled_model(id_piled, STAGE)
+        fit_id = id_piled
+    else:  # piled_naive
+        absmodel, relmodel = build_piled_naive_model(id_piled, STAGE)
+        pmod = None
         fit_id = id_piled
 
     ui.set_method(method)
@@ -89,16 +97,26 @@ def run_flagship(spectrum, method, id_unpiled, id_piled):
 
 
 def main():
-    id_unpiled, id_piled = setup_data()
+    outpath = RESULTS / "conf_flagship.json"
     out = {}
-    for spectrum, method in FLAGSHIP.items():
+    if outpath.exists():
+        with open(outpath) as f:
+            out = json.load(f)
+
+    missing = {s: m for s, m in FLAGSHIP.items() if s not in out}
+    if not missing:
+        print("nothing to do -- all flagship spectra already in "
+              f"{outpath}")
+        return
+
+    id_unpiled, id_piled = setup_data()
+    for spectrum, method in missing.items():
         print(f"running flagship conf for {spectrum} (Stage {STAGE}, "
               f"{method}) ...", flush=True)
         out[spectrum] = run_flagship(spectrum, method, id_unpiled, id_piled)
         print(f"  done: conf_time={out[spectrum]['conf_time_s']:.1f}s "
               f"covar_time={out[spectrum]['covar_time_s']:.1f}s", flush=True)
 
-    outpath = RESULTS / "conf_flagship.json"
     with open(outpath, "w") as f:
         json.dump(out, f, indent=2)
     print(f"wrote {outpath}")

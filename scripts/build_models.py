@@ -189,6 +189,35 @@ def build_piled_model(id_piled, stage="B"):
     return absmodel, relmodel, pmod
 
 
+def build_piled_naive_model(id_piled, stage="B"):
+    """Fit the *piled* data with the plain (unpiled-style) `tbabs*relxill`
+    model -- no `jdpileup` wrap at all. This is the "what if you didn't
+    know/correct for pileup" control case: same data as build_piled_model(),
+    same model form as build_unpiled_model(), deliberately mismatched. Its
+    whole purpose is to quantify, by comparison with build_piled_model()'s
+    jdpileup-corrected fit, how much parameter bias pileup introduces when
+    it goes unmodeled versus when it's explicitly corrected for -- see
+    CLAUDE.md Phase 3/5.
+    """
+    # Defensive, not redundant: set_source() does NOT clear a pileup model
+    # already attached to this dataset id via set_pileup_model() -- it's
+    # stored separately from the source model. If build_piled_model() was
+    # called on this same id earlier in this session (e.g. scripts that
+    # build multiple flagship models in one process, like make_plots.py),
+    # skipping this line would silently leave the *old* jdpileup wrap
+    # active underneath what's supposed to be the uncorrected model,
+    # defeating the entire point of this function. Confirmed by hitting
+    # exactly this bug while building results/plots/piled_naive_stageB_fit.png.
+    ui.delete_pileup_model(id_piled)
+
+    absmodel, relmodel = build_source_model("piled_naive")
+    apply_stage(relmodel, stage)
+    reset_thawed_to_start(absmodel, ABS_START)
+    reset_thawed_to_start(relmodel, RELXILL_START)
+    ui.set_source(id_piled, absmodel * relmodel)
+    return absmodel, relmodel
+
+
 if __name__ == "__main__":
     id_unpiled, id_piled = setup_data()
 

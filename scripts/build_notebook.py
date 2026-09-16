@@ -39,20 +39,24 @@ repeat every decision made along the way -- see those two files for the
 full reasoning, including why particular choices were made (statistic,
 freezing stages, pileup parameters, etc).
 
-**What this notebook does live**: loads the two spectra, builds the
-`tbabs*relxill` (+ `jdpileup` for the piled case) models, fits the
-literature-standard "Stage B" configuration for both spectra, and plots
-the results.
+**What this notebook does live**: loads the two spectra, builds three
+Stage-B models -- (1) `tbabs*relxill` on the unpiled spectrum, (2) the same
+wrapped in `jdpileup` on the piled spectrum (the physically correct
+treatment), and (3) the same **piled** spectrum fit with the **plain,
+uncorrected** `tbabs*relxill` model (no `jdpileup` at all -- the mistake an
+analyst makes by not accounting for pileup) -- fits all three, and plots
+the results. The third case was added specifically to answer: *how much
+does it actually matter whether you correct for pileup?*
 
-**What it loads from disk instead of recomputing**: the full 24-combination
-(2 spectra x 4 freezing stages x 3 optimizers) fit grid from Phase 4, and
-the `conf`-vs-`covar` comparison from Phase 5 -- the former because several
-of those combinations are slow (`moncar` in particular) and one
-combination (piled, Stage A) crashes the Python process outright by
-design of relxill's own error handling (see Phase 4 in `CLAUDE.md`), and
-the latter because the piled spectrum's `conf` calculation alone takes
-~40 minutes. Re-running `../scripts/run_fits.py` and
-`../scripts/run_conf_flagship.py` reproduces those files if wanted.""")
+**What it loads from disk instead of recomputing**: the full 36-combination
+(3 spectrum/model cases x 4 freezing stages x 3 optimizers) fit grid from
+Phase 4, and the `conf`-vs-`covar` comparison from Phase 5 -- the former
+because several of those combinations are slow (`moncar` in particular) and
+some combinations (Stage A on either piled case) crash the Python process
+outright by design of relxill's own error handling (see Phase 4 in
+`CLAUDE.md`), and the latter because the piled spectrum's `conf`
+calculation alone takes ~40 minutes. Re-running `../scripts/run_fits.py`
+and `../scripts/run_conf_flagship.py` reproduces those files if wanted.""")
 
 code(r"""import os
 import sys
@@ -80,7 +84,8 @@ import relxill.ui  # noqa: F401  registers xsumrelxill etc. with Sherpa
 
 from load_data import setup_data, TARGET_ID
 from build_models import (
-    build_unpiled_model, build_piled_model, GROUND_TRUTH,
+    build_unpiled_model, build_piled_model, build_piled_naive_model,
+    GROUND_TRUTH,
 )
 
 RESULTS = PROJECT_ROOT / "results"
@@ -123,15 +128,23 @@ md(r"""## Build the models (Phase 3)
   `set_pileup_model()` -- Sherpa inserts pileup (and folds the ARF in
   internally) between the source model and the RMF, which is where it
   physically belongs.
+- **Piled, uncorrected ("piled_naive")**: the *same* piled data, fit with
+  the plain `xstbabs * xsumrelxill` model -- no `jdpileup` at all. Note:
+  `build_piled_naive_model()` explicitly deletes any pileup model already
+  attached to the piled dataset first, since Sherpa keeps a dataset's
+  pileup model separate from its source model -- otherwise building this
+  right after the jdpileup-corrected model above would silently leave the
+  old pileup wrap active underneath what's supposed to be the uncorrected
+  fit (a real bug hit once while making this project's diagnostic plots).
 
-Both use **Stage B** here: the literature-standard freezing (`Rin=-1`
+All three use **Stage B** here: the literature-standard freezing (`Rin=-1`
 tied to the ISCO, `Rout=400`, single-power-law emissivity, `Ecut=300` keV
 fixed -- a single CCD-resolution spectrum has essentially no leverage on
 any of these). Free parameters: `nH, a, Incl, gamma, logxi, Afe,
-refl_frac, norm` (+ pileup's `alpha, f` for the piled case). See
-`CLAUDE.md` Phase 3 for the full Stage A-D ladder and the reasoning behind
-each freeze -- this notebook only reproduces Stage B live; the other three
-stages' results are loaded from disk further down.""")
+refl_frac, norm` (+ pileup's `alpha, f` for the jdpileup-corrected piled
+case only). See `CLAUDE.md` Phase 3 for the full Stage A-D ladder and the
+reasoning behind each freeze -- this notebook only reproduces Stage B
+live; the other three stages' results are loaded from disk further down.""")
 
 code(r"""STAGE = "B"
 
@@ -140,7 +153,7 @@ print("--- unpiled full model ---")
 print(ui.get_model(id_unpiled))""")
 
 code(r"""abs_p, rel_p, pmod_p = build_piled_model(id_piled, STAGE)
-print("--- piled full model ---")
+print("--- piled full model (jdpileup-corrected) ---")
 print(ui.get_model(id_piled))""")
 
 md(r"""## Fit Stage B live (Phase 4)
@@ -164,7 +177,22 @@ ui.fit(id_piled)  # ~40-60s
 fr_p = ui.get_fit_results()
 print(fr_p)""")
 
-md("## Diagnostic plots: data, model, and ratio")
+md(r"""Now the third case -- same piled data, `jdpileup` removed, plain
+`tbabs*relxill` fit from scratch. This answers the question this case was
+added for: does the fit *look* obviously wrong if you forget to correct
+for pileup?""")
+
+code(r"""abs_pn, rel_pn = build_piled_naive_model(id_piled, STAGE)
+print("--- piled full model (NOT corrected for pileup) ---")
+print(ui.get_model(id_piled))
+
+ui.set_method("neldermead")
+ui.set_method_opt("maxfev", 4000)
+ui.fit(id_piled)  # ~20s
+fr_pn = ui.get_fit_results()
+print(fr_pn)""")
+
+md("## Diagnostic plots: data, model, and ratio, all three cases")
 
 code(r"""def plot_fit(fit_id, title, ax_top, ax_bot):
     dplot = ui.get_data_plot(fit_id)
@@ -186,21 +214,48 @@ code(r"""def plot_fit(fit_id, title, ax_top, ax_bot):
     ax_bot.set_ylabel("data / model"); ax_bot.set_xlabel("Energy (keV)")
 
 
-fig, axes = plt.subplots(2, 2, figsize=(12, 6), sharex="col",
+# re-fit unpiled and jdpileup-corrected piled since id_piled's source model
+# now points at the uncorrected fit above -- rebuild+refit each in turn so
+# every panel below reflects its own case's actual best fit
+build_unpiled_model(id_unpiled, STAGE)
+ui.set_method("levmar"); ui.set_method_opt("maxfev", 1600)
+ui.fit(id_unpiled)
+fr_u = ui.get_fit_results()
+
+build_piled_model(id_piled, STAGE)
+ui.set_method("neldermead"); ui.set_method_opt("maxfev", 4000)
+ui.fit(id_piled)
+fr_p = ui.get_fit_results()
+
+fig, axes = plt.subplots(2, 3, figsize=(16, 6), sharex="col",
                            gridspec_kw=dict(height_ratios=[3, 1], hspace=0.05))
 plot_fit(id_unpiled, f"unpiled, Stage B (cstat={fr_u.statval:.1f})",
          axes[0, 0], axes[1, 0])
-plot_fit(id_piled, f"piled, Stage B (cstat={fr_p.statval:.1f})",
+plot_fit(id_piled, f"piled, corrected, Stage B (cstat={fr_p.statval:.1f})",
          axes[0, 1], axes[1, 1])
+
+build_piled_naive_model(id_piled, STAGE)
+ui.set_method("neldermead"); ui.set_method_opt("maxfev", 4000)
+ui.fit(id_piled)
+fr_pn = ui.get_fit_results()
+plot_fit(id_piled, f"piled, UNCORRECTED, Stage B (cstat={fr_pn.statval:.1f})",
+         axes[0, 2], axes[1, 2])
+
 fig.tight_layout()
 plt.show()""")
 
+md(r"""Note how visually similar the "corrected" and "uncorrected" piled
+panels are, and how close their `cstat` values are -- this is the
+headline point of adding this third case: **you cannot tell from fit
+quality alone whether pileup was actually corrected for.**""")
+
 md(r"""## Full Phase 4 grid (loaded from disk)
 
-All 24 (spectrum x stage x method) combinations -- see `../CLAUDE.md`
-Phase 4 for why this is loaded rather than recomputed live (runtime, and
-the piled/Stage A crash). Each combination in the original run was
-executed as its own subprocess for exactly that crash-safety reason.""")
+All 36 (spectrum/model-case x stage x method) combinations -- see
+`../CLAUDE.md` Phase 4 for why this is loaded rather than recomputed live
+(runtime, and the Stage A crash on either piled case). Each combination in
+the original run was executed as its own subprocess for exactly that
+crash-safety reason.""")
 
 code(r"""def html_table(headers, rows):
     th = "".join(f"<th style='text-align:left;padding:2px 8px'>{h}</th>" for h in headers)
@@ -218,7 +273,9 @@ records = raw["records"]
 STAGES = ["A", "B", "C", "D"]
 METHODS = ["levmar", "neldermead", "moncar"]
 
-for spectrum in ("unpiled", "piled"):
+SPECTRA = ["unpiled", "piled", "piled_naive"]
+
+for spectrum in SPECTRA:
     rows = []
     for stage in STAGES:
         for method in METHODS:
@@ -238,15 +295,19 @@ for spectrum in ("unpiled", "piled"):
         ["stage", "method", "converged", "cstat", "reduced stat", "nfev", "time (s)"],
         rows)))""")
 
-md(r"""Note the three `CRASHED` rows for piled/Stage A: relxill's C++ code
-calls a hard, uncatchable process abort on an unphysical `Rout<=Rin`
-parameter excursion, which all three optimizers hit when given the full
-15-parameter freedom of Stage A on the piled model. This is not
-reproduced live in this notebook for the obvious reason that it would
-take the kernel down with it -- see `CLAUDE.md` Phase 4 for the full
-account, including why this is treated as a genuine finding (Stage A is
-numerically intractable for the piled spectrum, not just poorly
-constrained) rather than a bug to silently work around.""")
+md(r"""Note the `CRASHED` rows for Stage A on *both* piled cases --
+`piled` (jdpileup-corrected, 15 free params) and `piled_naive` (plain
+model, 13 free params -- the same count as `unpiled`, which never
+crashes). relxill's C++ code calls a hard, uncatchable process abort on an
+unphysical `Rout<=Rin` parameter excursion; the fact that it happens for
+`piled_naive` too shows this is driven by the *piled data's shape itself*
+sending the optimizer somewhere the unpiled data never goes, not merely by
+pileup's extra free parameters. This is not reproduced live in this
+notebook for the obvious reason that it would take the kernel down with
+it -- see `CLAUDE.md` Phase 4 for the full account, including why this is
+treated as a genuine finding (Stage A is numerically intractable for the
+piled spectrum, corrected or not) rather than a bug to silently work
+around.""")
 
 md(r"""## Ground-truth comparison and conf-vs-covar (Phase 5, loaded from disk)
 
@@ -263,8 +324,33 @@ code(r"""with open(RESULTS / "analysis_summary.json") as f:
 gt_labels = {"a": "spin (a)", "Incl": "Incl (deg)", "gamma": "gamma",
              "logxi": "logxi", "Afe": "Afe", "refl_frac": "refl_frac",
              "nH": "nH (1e22 cm^-2)"}
+gt_key_map = {"a": "spin", "Incl": "incl"}
 
-for spectrum in ("unpiled", "piled"):
+# headline: all three cases side by side (the comparison this third case
+# was specifically added for)
+rows = []
+for short, label in gt_labels.items():
+    truth = GROUND_TRUTH.get(gt_key_map.get(short, short))
+    cells = []
+    for spectrum in ("unpiled", "piled", "piled_naive"):
+        c = summary["ground_truth_comparison"][f"{spectrum}/B"]["comparison"].get(short)
+        cells.append(f"{c['fitted']:.4g} ({c['rel_diff_pct']:+.1f}%)" if c else "-")
+    rows.append([label, f"{truth:.4g}"] + cells)
+display(HTML("<h4>Headline: Stage B, all three cases vs. ground truth</h4>"))
+display(HTML(html_table(
+    ["parameter", "truth", "unpiled", "piled (corrected)", "piled_naive (uncorrected)"],
+    rows)))""")
+
+md(r"""**Reading this table**: spin is severely biased high in *both*
+piled cases (~76-78%) regardless of jdpileup correction -- the correction
+does not rescue the spin measurement here. `refl_frac` is the parameter
+most sensitive to *whether* pileup was corrected for (+134% uncorrected
+vs. +34% corrected vs. +65% for the unpiled fit itself -- the last of
+those likely tangled up with the known `norm` convention mismatch from
+Phase 3, not a pileup effect). Inclination and `nH` are comparatively
+robust in all three cases. Full discussion: `../results/report.md`.""")
+
+code(r"""for spectrum in ("unpiled", "piled", "piled_naive"):
     comp = summary["ground_truth_comparison"][f"{spectrum}/B"]["comparison"]
     rows = []
     for short, label in gt_labels.items():
@@ -279,7 +365,7 @@ for spectrum in ("unpiled", "piled"):
 code(r"""with open(RESULTS / "conf_flagship.json") as f:
     conf_flag = json.load(f)
 
-for spectrum in ("unpiled", "piled"):
+for spectrum in ("unpiled", "piled", "piled_naive"):
     flag = conf_flag[spectrum]
     rows = []
     for name, val, clo, chi, klo, khi in zip(
@@ -298,23 +384,33 @@ for spectrum in ("unpiled", "piled"):
 
 md(r"""## Summary
 
-- Both spectra fit reasonably well visually (few-percent residuals across
-  most of the 0.3-10 keV band) at Stage B, despite reduced stat > 1 in
-  both cases -- with millions of counts, `cstat` has enough statistical
-  power to detect small systematic mismatches that wouldn't show up in a
-  lower-count spectrum.
+- All three spectra/cases fit reasonably well visually (few-percent
+  residuals across most of the 0.3-10 keV band) at Stage B, despite
+  reduced stat > 1 in every case -- with millions of counts, `cstat` has
+  enough statistical power to detect small systematic mismatches that
+  wouldn't show up in a lower-count spectrum.
+- **A good fit statistic does not tell you whether pileup was corrected
+  for**: the uncorrected `piled_naive` fit is statistically as good as (or
+  marginally better than) the jdpileup-corrected `piled` fit, and looks
+  just as good in the diagnostic plots above.
+- **Correcting for pileup with jdpileup does not rescue the spin
+  measurement** for this source/pileup level -- both piled cases are
+  biased ~76-78% high relative to the close-to-truth unpiled fit.
+  `refl_frac` is the parameter that most clearly tracks whether pileup was
+  corrected for, even though it doesn't track spin's bias.
 - `conf` and `covar` genuinely disagree, and `covar` failed outright on
-  the piled fit -- don't trust `covar` alone on a highly nonlinear,
-  many-parameter model like this.
+  both piled fits (corrected and uncorrected) -- don't trust `covar` alone
+  on a highly nonlinear, many-parameter model like this.
 - The progressive freezing ladder (Stage A -> D) is not just a
   dimensionality-reduction convenience: Stage A is numerically
-  intractable for the piled spectrum (hard crash, all three optimizers),
-  and Stage C's "standard" solar-abundance assumption actively hurts the
-  fit for this particular (super-solar Afe) simulated source.
+  intractable for *either* piled case (hard crash, all three optimizers,
+  regardless of whether jdpileup's extra parameters are present), and
+  Stage C's "standard" solar-abundance assumption actively hurts the fit
+  for this particular (super-solar Afe) simulated source.
 
-Full discussion, all four stages, and the pileup-bias comparison:
-`../results/report.md`. Full methodology and decision log: `../CLAUDE.md`.
-Didactic write-up: `../writeup/`.""")
+Full discussion, all four stages, and the three-way pileup-bias
+comparison: `../results/report.md`. Full methodology and decision log:
+`../CLAUDE.md`. Didactic write-up: `../writeup/`.""")
 
 nb["cells"] = cells
 nb["metadata"] = {

@@ -174,5 +174,86 @@
       0.24902771040687455,
       0.0182788366533372
     ]
+  },
+  "piled_naive": {
+    "spectrum": "piled_naive",
+    "stage": "B",
+    "method": "neldermead",
+    "statval": 1005.8544249525077,
+    "dof": 657,
+    "rstat": 1.5309808598972718,
+    "fit_time_s": 17.796611070632935,
+    "covar_time_s": 0.5733239650726318,
+    "conf_time_s": 717.6824781894684,
+    "parnames": [
+      "abs_piled_naive.nH",
+      "refl_piled_naive.a",
+      "refl_piled_naive.Incl",
+      "refl_piled_naive.gamma",
+      "refl_piled_naive.logxi",
+      "refl_piled_naive.Afe",
+      "refl_piled_naive.refl_frac",
+      "refl_piled_naive.norm"
+    ],
+    "parvals": [
+      0.6912106827163387,
+      0.8759984700940602,
+      31.49792079496696,
+      1.2265816271184884,
+      1.2084549953823966,
+      2.2107036372645905,
+      33.519276298071674,
+      0.00013712377311754474
+    ],
+    "covar_parmins": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+    ],
+    "covar_parmaxes": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+    ],
+    "conf_parnames": [
+      "abs_piled_naive.nH",
+      "refl_piled_naive.a",
+      "refl_piled_naive.Incl",
+      "refl_piled_naive.gamma",
+      "refl_piled_naive.logxi",
+      "refl_piled_naive.Afe",
+      "refl_piled_naive.refl_frac",
+      "refl_piled_naive.norm"
+    ],
+    "conf_parmins": [
+      -0.03934225370224942,
+      -0.07157213376315197,
+      -0.9529011037023238,
+      -0.01541024018348347,
+      -1.1798585469475387,
+      -0.5603480292622207,
+      -1.7833778836227232,
+      -2.142558954961615e-06
+    ],
+    "conf_parmaxes": [
+      0.017848267787528682,
+      0.008982201458802352,
+      0.800848686008031,
+      0.20331871963274417,
+      0.1019901291573242,
+      0.07778834069911023,
+      29.526120897132827,
+      1.7219980663411817e-06
+    ]
   }
 }

@@ -1,0 +1,130 @@
+Adding additive       XSPEC local model: xsumrelline
+Adding convolution    XSPEC local model: xsumrelconv
+Adding additive       XSPEC local model: xsumrelline_lp
+Adding convolution    XSPEC local model: xsumrelconv_lp
+Adding additive       XSPEC local model: xsumrelxill
+Adding additive       XSPEC local model: xsumrelxilllp
+Adding additive       XSPEC local model: xsumxillver
+Adding additive       XSPEC local model: xsumxillvercp
+Adding additive       XSPEC local model: xsumrelxillcp
+Adding additive       XSPEC local model: xsumrelxilllpcp
+Adding additive       XSPEC local model: xsumxillverns
+Adding additive       XSPEC local model: xsumrelxillns
+Adding additive       XSPEC local model: xsumrelline_ring
+Adding additive       XSPEC local model: xsumrelxill_ring
+Adding additive       XSPEC local model: xsumrelxill_ring_ecut
+read ARF file /Users/juramaga/science/pileup/justina_fits/responses/id1000000000_arf.fits
+read RMF file /Users/juramaga/science/pileup/justina_fits/responses/c07_x222_y0531.rmf
+read ARF file /Users/juramaga/science/pileup/justina_fits/responses/id1000000000_arf.fits
+read RMF file /Users/juramaga/science/pileup/justina_fits/responses/c07_x222_y0531.rmf
+dataset unpiled: 0.0073:14.9504 -> 0.292:10.001 Energy (keV)
+dataset piled: 0.0073:14.9504 -> 0.292:10.001 Energy (keV)
+running flagship conf for piled_naive (Stage B, neldermead) ...
+Dataset               = piled
+Method                = neldermead
+Statistic             = cstat
+Initial fit statistic = 3.46009e+09
+Final fit statistic   = 1005.85 at function evaluation 3190
+Data points           = 665
+Degrees of freedom    = 657
+Probability [Q-value] = 4.17161e-17
+Reduced statistic     = 1.53098
+Change in statistic   = 3.46009e+09
+   abs_piled_naive.nH   0.691211    
+   refl_piled_naive.a   0.875998    
+   refl_piled_naive.Incl   31.4979     
+   refl_piled_naive.gamma   1.22658     
+   refl_piled_naive.logxi   1.20845     
+   refl_piled_naive.Afe   2.2107      
+   refl_piled_naive.refl_frac   33.5193     
+   refl_piled_naive.norm   0.000137124 
+WARNING: hard minimum hit for parameter abs_piled_naive.nH
+WARNING: hard maximum hit for parameter abs_piled_naive.nH
+WARNING: hard minimum hit for parameter refl_piled_naive.a
+WARNING: hard maximum hit for parameter refl_piled_naive.a
+WARNING: hard minimum hit for parameter refl_piled_naive.Incl
+WARNING: hard maximum hit for parameter refl_piled_naive.Incl
+WARNING: hard minimum hit for parameter refl_piled_naive.gamma
+WARNING: hard maximum hit for parameter refl_piled_naive.gamma
+WARNING: hard minimum hit for parameter refl_piled_naive.logxi
+WARNING: hard maximum hit for parameter refl_piled_naive.logxi
+WARNING: hard minimum hit for parameter refl_piled_naive.Afe
+WARNING: hard maximum hit for parameter refl_piled_naive.Afe
+WARNING: hard minimum hit for parameter refl_piled_naive.refl_frac
+WARNING: hard maximum hit for parameter refl_piled_naive.refl_frac
+WARNING: hard minimum hit for parameter refl_piled_naive.norm
+WARNING: hard maximum hit for parameter refl_piled_naive.norm
+Dataset               = piled
+Confidence Method     = covariance
+Iterative Fit Method  = None
+Fitting Method        = neldermead
+Statistic             = cstat
+covariance 1-sigma (68.2689%) bounds:
+   Param            Best-Fit  Lower Bound  Upper Bound
+   -----            --------  -----------  -----------
+   abs_piled_naive.nH     0.691211        -----        -----
+   refl_piled_naive.a     0.875998        -----        -----
+   refl_piled_naive.Incl      31.4979        -----        -----
+   refl_piled_naive.gamma      1.22658        -----        -----
+   refl_piled_naive.logxi      1.20845        -----        -----
+   refl_piled_naive.Afe       2.2107        -----        -----
+   refl_piled_naive.refl_frac      33.5193        -----        -----
+   refl_piled_naive.norm  0.000137124        -----        -----
+refl_piled_naive.refl_frac lower bound:	-1.78338
+refl_piled_naive.norm -: WARNING: The confidence level lies within (1.328387e-04, 1.371238e-04)
+refl_piled_naive.norm lower bound:	-2.14256e-06
+refl_piled_naive.Afe lower bound:	-0.560348
+refl_piled_naive.gamma lower bound:	-0.0154102
+abs_piled_naive.nH -: WARNING: The confidence level lies within (6.505823e-01, 6.531546e-01)
+abs_piled_naive.nH lower bound:	-0.0393423
+refl_piled_naive.a lower bound:	-0.0715721
+refl_piled_naive.refl_frac upper bound:	29.5261
+refl_piled_naive.Afe +: WARNING: The confidence level lies within (2.287020e+00, 2.289964e+00)
+refl_piled_naive.Afe upper bound:	0.0777883
+refl_piled_naive.a upper bound:	0.0089822
+abs_piled_naive.nH +: WARNING: The confidence level lies within (7.078089e-01, 7.103090e-01)
+abs_piled_naive.nH upper bound:	0.0178483
+refl_piled_naive.logxi lower bound:	-1.17986
+refl_piled_naive.gamma upper bound:	0.203319
+refl_piled_naive.logxi +: WARNING: The confidence level lies within (1.309195e+00, 1.311695e+00)
+refl_piled_naive.logxi upper bound:	0.10199
+refl_piled_naive.Incl -: WARNING: The confidence level lies within (3.054503e+01, 3.054501e+01)
+refl_piled_naive.Incl lower bound:	-0.952901
+refl_piled_naive.norm +: WARNING: The confidence level lies within (1.388479e-04, 1.388437e-04)
+refl_piled_naive.norm upper bound:	1.722e-06
+refl_piled_naive.Incl upper bound:	0.800849
+Dataset               = piled
+Confidence Method     = confidence
+Iterative Fit Method  = None
+Fitting Method        = neldermead
+Statistic             = cstat
+confidence 1-sigma (68.2689%) bounds:
+   Param            Best-Fit  Lower Bound  Upper Bound
+   -----            --------  -----------  -----------
+   abs_piled_naive.nH     0.691211   -0.0393423    0.0178483
+   refl_piled_naive.a     0.875998   -0.0715721    0.0089822
+   refl_piled_naive.Incl      31.4979    -0.952901     0.800849
+   refl_piled_naive.gamma      1.22658   -0.0154102     0.203319
+   refl_piled_naive.logxi      1.20845     -1.17986      0.10199
+   refl_piled_naive.Afe       2.2107    -0.560348    0.0777883
+   refl_piled_naive.refl_frac      33.5193     -1.78338      29.5261
+   refl_piled_naive.norm  0.000137124 -2.14256e-06    1.722e-06
+  done: conf_time=717.7s covar_time=0.6s
+wrote /Users/juramaga/science/pileup/justina_fits/results/conf_flagship.json
+tbvabs Version 2.3
+Cosmic absorption with grains and H2, modified from
+Wilms, Allen, & McCray, 2000, ApJ 542, 914-924
+Questions: Joern Wilms
+joern.wilms@sternwarte.uni-erlangen.de
+joern.wilms@fau.de
+
+http://pulsar.sternwarte.uni-erlangen.de/wilms/research/tbabs/
+
+PLEASE NOTICE:
+To get the model described by the above paper
+you will also have to set the abundances:
+   abund wilm
+
+Note that this routine ignores the current cross section setting
+as it always HAS to use the Verner cross sections as a baseline.
+ *** loading RELXILL model (version 2.9.0) *** 
