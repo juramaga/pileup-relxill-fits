@@ -10,7 +10,10 @@ import json
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-RESULTS = ROOT / "results"
+from target import (  # noqa: E402
+    RESULTS_DIR as RESULTS, TARGET_ID, DEFAULT_ID, flagship_records,
+)
+IS_DEFAULT = TARGET_ID == DEFAULT_ID
 RAW = RESULTS / "fits_raw.json"
 
 # nH's units in the index CSV are assumed to be the tbabs-standard
@@ -144,9 +147,9 @@ def method_agreement(records):
             continue
         dicts = [as_dict(r) for r in rs]
         methods = [r["method"] for r in rs]
-        shared = set(dicts[0])
-        for d in dicts[1:]:
-            shared &= set(d)
+        # ordered by parameter order in the first fit, so reruns are
+        # byte-stable (a bare set's iteration order is not)
+        shared = [sn for sn in dicts[0] if all(sn in d for d in dicts[1:])]
         max_rel_diff = {}
         for sn in shared:
             vals = [d[sn][0] for d in dicts]
@@ -205,6 +208,21 @@ def main():
     best = best_per_group(records)
     agreement = method_agreement(records)
     gtc = ground_truth_comparison(records, ground_truth, best)
+
+    # Non-default IDs: also compare the multi-start-checked, physical
+    # (refl_frac > 0) Stage B flagship of each case against truth -- see
+    # run_multistart.py / target.flagship_records() for why the fixed-start
+    # grid's own "best" can't be trusted as the Stage B answer there.
+    if not IS_DEFAULT:
+        for spectrum, rec in flagship_records().items():
+            key = (spectrum, "B_flagship")
+            pseudo = {key: dict(method=rec["method"])}
+            comp = ground_truth_comparison(
+                [dict(rec, stage="B_flagship")], ground_truth, pseudo)
+            entry = comp["/".join(key)]
+            entry.update(source=rec["source"], statval=rec["statval"],
+                         rstat=rec.get("rstat"))
+            gtc["/".join(key)] = entry
 
     summary = dict(
         best_per_group={"/".join(k): v for k, v in best.items()},

@@ -6,6 +6,9 @@ v0017_800ks_index.csv
 # in CLAUDE.md Phase 1). build_attempt*.log are kept (small, useful history).
 relxill/src/
 relxill/tables/
+# (slash-free forms also match symlinks, e.g. in .claude/worktrees/ checkouts)
+relxill/src
+relxill/tables
 relxill/relxill_model_v2.9.0.tgz
 
 # macOS zip extraction artifact

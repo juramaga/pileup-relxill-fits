@@ -29,8 +29,17 @@ def code(text):
     cells.append(nbf.v4.new_code_cell(text))
 
 
-md(r"""# relxill fit of MARX-simulated Chandra spectrum ID 1000000081
+md(r"""# relxill fits of MARX-simulated Chandra spectra: ID 1000000081 (heavy pileup) and ID 1000001838 (moderate pileup)
 ### piled-up vs. unpiled, Sherpa (CIAO 4.17) + relxill, multiple optimizers
+
+**Part 1** (below) is the original, heavily piled-up target, ID 1000000081
+(~93% of incident events lost to pileup; N(unpiled)/N(piled) = 14.3).
+**Part 2** (after Part 1's summary) repeats the whole procedure for
+ID 1000001838, a *moderately* piled-up simulation (~30% count loss;
+N(unpiled)/N(piled) = 1.43) with physics close to 081's, and ends with a
+side-by-side comparison of the two.
+
+# Part 1 -- ID 1000000081 (heavy pileup)
 
 This notebook is a runnable walkthrough of the project documented in full
 in `../CLAUDE.md` (methodology / decisions / Phases 1-5) and
@@ -411,6 +420,267 @@ md(r"""## Summary
 Full discussion, all four stages, and the three-way pileup-bias
 comparison: `../results/report.md`. Full methodology and decision log:
 `../CLAUDE.md`. Didactic write-up: `../writeup/`.""")
+
+# ---------------------------------------------------------------------------
+# Part 2: ID 1000001838 (moderate pileup)
+# ---------------------------------------------------------------------------
+
+md(r"""# Part 2 -- ID 1000001838 (moderate pileup)
+
+Same procedure, second simulation. Why this one: 081 sits at the extreme
+end of the grid's pileup distribution (~15 incident counts per 3.2 s frame,
+93% count loss). 1838 was picked from the ~30%-count-loss population as the
+case whose simulation inputs are closest to 081's (Gamma~1.39 vs 1.33,
+a~0.42 vs 0.49, i~26 deg vs 31, same nH, same detector position/RMF), so
+the comparison mostly isolates the *pileup level*. The main physics
+differences: 1838 is much fainter (~25x fewer counts), iron-richer
+(Afe~7.3 vs 2.6) and more ionized (logxi~2.4 vs 1.5).
+
+Everything below uses the same scripts as Part 1 -- they select the
+spectrum via the `TARGET_ID` environment variable (see
+`../scripts/target.py`) and write this ID's outputs under
+`../results/id1000001838/`:
+
+```
+TARGET_ID=1000001838 python extract_spectrum.py 1000001838
+TARGET_ID=1000001838 python run_fits.py          # 36-combo grid
+TARGET_ID=1000001838 python run_multistart.py    # new: Stage B multi-start
+TARGET_ID=1000001838 python analyze_results.py
+TARGET_ID=1000001838 python run_conf_flagship.py
+TARGET_ID=1000001838 python make_plots.py
+TARGET_ID=1000001838 python write_report.py
+```
+
+One step is new relative to Part 1 -- a **multi-start check of Stage B**
+-- for a reason that shows up in the live fits just below.""")
+
+code(r"""from target import load_ground_truth, flagship_records
+
+ID2 = 1000001838
+RESULTS2 = PROJECT_ROOT / "results" / f"id{ID2}"
+GT2 = load_ground_truth(ID2)
+
+ui.clean()  # drop Part 1's datasets/models; relxill stays registered
+id_unpiled, id_piled = setup_data(target_id=ID2)
+
+n = {}
+for idname in (id_unpiled, id_piled):
+    d = ui.get_data(idname)
+    n[idname] = d.get_dep(filter=True).sum()
+    print(f"{idname:8s}  exposure={d.exposure:.0f}s  counts(noticed)={n[idname]:.0f}")
+print(f"N(unpiled)/N(piled) in 0.3-10 keV = {n[id_unpiled] / n[id_piled]:.3f}")
+print()
+for k, v in GT2.items():
+    print(f"{k:10s} = {v:.4g}")""")
+
+md(r"""## Stage B live fits from the canonical starting point
+
+Exactly the protocol of Part 1 / Phase 4: every thawed parameter starts
+from the same generic values (`build_models.RELXILL_START`: a=0.998,
+logxi=3.1, Afe=1, refl_frac=3, ...), then `levmar`.""")
+
+code(r"""def short_pars(models):
+    return {p.name: p.val for m in models for p in m.pars if not p.frozen}
+
+def fit_levmar(fit_id):
+    ui.set_method("levmar"); ui.set_method_opt("maxfev", 2000)
+    ui.fit(fit_id)
+    return ui.get_fit_results()
+
+canon = {}
+m_u = build_unpiled_model(id_unpiled, STAGE)
+canon["unpiled"] = (fit_levmar(id_unpiled).statval, short_pars(m_u))
+m_p = build_piled_model(id_piled, STAGE)
+canon["piled"] = (fit_levmar(id_piled).statval, short_pars(m_p))
+m_pn = build_piled_naive_model(id_piled, STAGE)
+canon["piled_naive"] = (fit_levmar(id_piled).statval, short_pars(m_pn))
+
+for case, (stat, pars) in canon.items():
+    print(f"{case:12s} cstat={stat:8.1f}  a={pars['a']:+.3f}  "
+          f"refl_frac={pars['refl_frac']:+.2f}  logxi={pars['logxi']:.2f}  "
+          f"Afe={pars['Afe']:.2f}")""")
+
+md(r"""Look at the jdpileup-corrected `piled` row: `refl_frac` comes out
+**negative**. In relxill, `refl_frac < 0` is not "less reflection" -- it
+switches the model to *reflection-only* output (the primary power law is
+dropped), a qualitatively different spectral model. Worse, in the full grid
+(below) the piled **Stage C** fit -- Afe frozen at 1, i.e. a *subset* of
+Stage B's parameter space -- reaches a *lower* cstat than any Stage B fit.
+That is impossible if the Stage B searches had found Stage B's minimum, so
+from the canonical start all three optimizers stop in local minima.
+
+That is why `run_multistart.py` exists: it restarts Stage B from a coarse,
+truth-agnostic lattice of starting points (a in {0, 0.5, 0.9} x logxi in
+{1, 2.5} x Afe in {1, 5}) plus seeds taken from the grid's own Stage C/D
+solutions, each as `levmar` followed by a `neldermead` polish, each in its
+own subprocess. The **flagship** Stage B fit of each case is then the
+lowest-cstat *physical* (refl_frac > 0) solution among all grid and
+multi-start fits (`target.flagship_records()`). The ground truth is never
+used as a seed.""")
+
+code(r"""with open(RESULTS2 / "multistart_stageB.json") as f:
+    ms = json.load(f)
+
+for case in SPECTRA:
+    rows = []
+    for k, r in enumerate(ms[case]):
+        if r.get("statval") is None:
+            rows.append([k, f"<b>{r.get('message')}</b>", "-", "-", "-"])
+            continue
+        d = {nm.split(".")[-1]: v for nm, v in zip(r["parnames"], r["parvals"])}
+        seed = ("lattice" if k < 12 else "grid C/D seed")
+        rows.append([k, seed, f"{r['statval']:.1f}", f"{d['a']:+.3f}",
+                     f"{d['refl_frac']:+.2f}"])
+    rows.sort(key=lambda row: float(row[2]) if row[2] not in ("-",) else 1e99)
+    display(HTML(f"<h4>{case}: Stage B multi-start outcomes (sorted by cstat)</h4>"))
+    display(HTML(html_table(["start", "seed type", "cstat", "a", "refl_frac"], rows)))
+
+flag2 = flagship_records("B", RESULTS2)
+for case, r in flag2.items():
+    print(f"flagship {case:12s}: cstat={r['statval']:.1f}  from {r['source']}  "
+          f"(canonical-start levmar: {canon[case][0]:.1f})")""")
+
+md("## Diagnostic plots: the three flagship Stage B fits")
+
+code(r"""def set_from_record(models, rec):
+    byname = {p.fullname: p for m in models for p in m.pars}
+    for nm, v in zip(rec["parnames"], rec["parvals"]):
+        byname[nm].val = v
+
+fig, axes = plt.subplots(2, 3, figsize=(16, 6), sharex="col",
+                           gridspec_kw=dict(height_ratios=[3, 1], hspace=0.05))
+
+m_u = build_unpiled_model(id_unpiled, STAGE)
+set_from_record(m_u, flag2["unpiled"])
+plot_fit(id_unpiled, f"1838 unpiled, Stage B (cstat={ui.calc_stat(id_unpiled):.1f})",
+         axes[0, 0], axes[1, 0])
+
+m_p = build_piled_model(id_piled, STAGE)
+set_from_record(m_p, flag2["piled"])
+plot_fit(id_piled, f"1838 piled, corrected (cstat={ui.calc_stat(id_piled):.1f})",
+         axes[0, 1], axes[1, 1])
+
+m_pn = build_piled_naive_model(id_piled, STAGE)
+set_from_record(m_pn, flag2["piled_naive"])
+plot_fit(id_piled, f"1838 piled, UNCORRECTED (cstat={ui.calc_stat(id_piled):.1f})",
+         axes[0, 2], axes[1, 2])
+
+fig.tight_layout()
+plt.show()""")
+
+md(r"""## Full Phase 4 grid for 1838 (loaded from disk)
+
+Same 36 combinations as Part 1, same fixed starting point for every
+combination (so these rows are directly comparable to Part 1's).""")
+
+code(r"""with open(RESULTS2 / "fits_raw.json") as f:
+    records2 = json.load(f)["records"]
+
+for spectrum in SPECTRA:
+    rows = []
+    for stage in STAGES:
+        for method in METHODS:
+            r = next((r for r in records2 if r["spectrum"] == spectrum
+                       and r["stage"] == stage and r["method"] == method), None)
+            if r is None:
+                continue
+            if r.get("message") in ("CRASHED", "TIMEOUT", "PYTHON_EXCEPTION"):
+                rows.append([stage, method, f"<b>{r['message']}</b>", "-", "-", "-", "-"])
+                continue
+            rows.append([stage, method, r.get("succeeded"), f"{r['statval']:.1f}",
+                         f"{r['rstat']:.2f}", r.get("nfev"), f"{r['wall_time_s']:.1f}"])
+    display(HTML(f"<h4>1838 {spectrum}</h4>"))
+    display(HTML(html_table(
+        ["stage", "method", "converged", "cstat", "reduced stat", "nfev", "time (s)"],
+        rows)))""")
+
+md(r"""## Ground truth, conf vs. covar, and the 081-vs-1838 comparison""")
+
+code(r"""with open(RESULTS2 / "analysis_summary.json") as f:
+    summary2 = json.load(f)
+gtc2 = summary2["ground_truth_comparison"]
+
+rows = []
+for short, label in gt_labels.items():
+    truth = GT2.get(gt_key_map.get(short, short))
+    cells = []
+    for spectrum in SPECTRA:
+        c = gtc2[f"{spectrum}/B_flagship"]["comparison"].get(short)
+        cells.append(f"{c['fitted']:.4g} ({c['rel_diff_pct']:+.1f}%)" if c else "-")
+    rows.append([label, f"{truth:.4g}"] + cells)
+display(HTML("<h4>1838 headline: Stage B flagship fits vs. ground truth</h4>"))
+display(HTML(html_table(
+    ["parameter", "truth", "unpiled", "piled (corrected)", "piled_naive (uncorrected)"],
+    rows)))""")
+
+code(r"""with open(RESULTS2 / "conf_flagship.json") as f:
+    conf2 = json.load(f)
+
+for spectrum in SPECTRA:
+    flag = conf2[spectrum]
+    rows = []
+    for name, val, clo, chi, klo, khi in zip(
+            flag["parnames"], flag["parvals"],
+            flag["covar_parmins"], flag["covar_parmaxes"],
+            flag["conf_parmins"], flag["conf_parmaxes"]):
+        covar_s = "undefined" if clo is None or chi is None else f"[{clo:+.4g}, {chi:+.4g}]"
+        klo_s = "(boundary)" if klo is None else f"{klo:+.4g}"
+        khi_s = "(boundary)" if khi is None else f"{khi:+.4g}"
+        conf_s = "undefined" if klo is None and khi is None else f"[{klo_s}, {khi_s}]"
+        rows.append([name.split(".")[-1], f"{val:.4g}", covar_s, conf_s])
+    display(HTML(f"<h4>1838 {spectrum}, Stage B: covar vs. conf "
+                   f"(covar {flag['covar_time_s']:.1f}s, conf {flag['conf_time_s']:.1f}s)</h4>"))
+    display(HTML(html_table(["parameter", "best fit", "covar 1-sigma", "conf 1-sigma"], rows)))""")
+
+code(r"""# 081 vs 1838: Stage B bias relative to each simulation's own truth.
+# 081 uses Part 1's grid-best Stage B fits; 1838 uses the multi-start
+# flagship fits (see above for why).
+rows = []
+for short, label in gt_labels.items():
+    row = [label]
+    for spectrum in SPECTRA:
+        c1 = summary["ground_truth_comparison"][f"{spectrum}/B"]["comparison"].get(short)
+        c2 = gtc2[f"{spectrum}/B_flagship"]["comparison"].get(short)
+        row.append(f"{c1['rel_diff_pct']:+.0f}%" if c1 else "-")
+        row.append(f"{c2['rel_diff_pct']:+.0f}%" if c2 else "-")
+    rows.append(row)
+display(HTML("<h4>Stage B relative bias vs. truth: 081 (heavy pileup) vs 1838 (moderate)</h4>"))
+display(HTML(html_table(
+    ["parameter", "unpiled 081", "unpiled 1838", "piled 081", "piled 1838",
+     "naive 081", "naive 1838"], rows)))""")
+
+md(r"""## Part 2 summary: heavy (081) vs. moderate (1838) pileup
+
+- **A fixed starting point is not enough at this count level.** From the
+  canonical start, every piled Stage B search stopped in a local minimum,
+  and the "best" of them was relxill's reflection-only (`refl_frac < 0`)
+  branch. A coarse, truth-agnostic multi-start moved the physical optimum
+  from cstat 970 (unphysical) to 702.6 for the piled case, and from 733.6
+  to 702.0 even for the unpiled case. Seeds taken from the more
+  constrained Stage C/D fits never beat the lattice.
+- **At ~30% count loss, `jdpileup` works.** The corrected piled fit
+  matches the unpiled fit in quality (cstat 702.6 vs 702.0, reduced 1.07
+  for both) and in parameters (spin +18% vs +13% of truth, refl_frac +1%
+  vs −4%, logxi/incl/gamma/nH within a few percent of each other). At
+  081's ~93% loss, the corrected spin was still +76% off.
+- **Uncorrected pileup is badly biased at both levels. At moderate pileup
+  the fit statistic reveals it; at heavy pileup it doesn't.** For 1838 the naive fit is
+  worse by Δcstat ≈ 340 on the same data, with structured residuals
+  (2–2.3 keV edge, excess above ~7 keV), and its parameters are telltale:
+  retrograde spin, logxi and Afe at their lower limits, refl_frac
+  +130%. For 081, the naive fit was statistically as good as the
+  corrected one.
+- **conf vs. covar**: `covar` now returns bounds on the corrected piled
+  fit (it failed for 081) but they are often several times *wider* than
+  `conf`'s. The linear approximation is unreliable in both directions.
+- **Shared, non-pileup offsets** (gamma ~−10%, Afe pinned at relxill's
+  limit of 10 vs true 7.3) appear identically in the unpiled and corrected
+  fits, so they reflect model degeneracies at this count level, not pileup.
+- **Caveat**: 081 was not multi-started. Given how much that changed
+  1838's answers, rerunning `run_multistart.py` for 081 is the next step
+  before quoting the heavy-vs-moderate contrast quantitatively.
+
+Full numbers: `../results/id1000001838/report.md`.""")
 
 nb["cells"] = cells
 nb["metadata"] = {

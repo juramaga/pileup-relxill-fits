@@ -12,7 +12,7 @@ from sherpa.astro import ui
 
 ROOT = Path(__file__).resolve().parent.parent
 
-TARGET_ID = 1000000081
+from target import TARGET_ID  # noqa: E402  (env var TARGET_ID, see target.py)
 UNPILED_PHA = ROOT / "data" / "unpiled" / f"id{TARGET_ID}_unpiled.pha"
 PILED_PHA = ROOT / "data" / "piled" / f"id{TARGET_ID}_piled.pha"
 
@@ -20,13 +20,23 @@ FIT_ELO, FIT_EHI = 0.3, 10.0  # keV - matches the RMF/ARF energy grid exactly
 STATISTIC = "cstat"  # Poisson counts, no background spectrum -> cstat (not wstat)
 
 
-def setup_data(id_unpiled="unpiled", id_piled="piled"):
+def pha_paths(target_id=TARGET_ID):
+    return (ROOT / "data" / "unpiled" / f"id{target_id}_unpiled.pha",
+            ROOT / "data" / "piled" / f"id{target_id}_piled.pha")
+
+
+def setup_data(id_unpiled="unpiled", id_piled="piled", target_id=None):
     """Load both spectra, notice the common fit range, set the statistic.
+
+    `target_id` defaults to TARGET_ID (env var, see target.py); pass it
+    explicitly to load a different simulation in the same session (e.g.
+    the notebook's second-spectrum section).
 
     Returns the two Sherpa dataset ids used.
     """
-    ui.load_pha(id_unpiled, str(UNPILED_PHA))
-    ui.load_pha(id_piled, str(PILED_PHA))
+    unpiled_pha, piled_pha = pha_paths(target_id or TARGET_ID)
+    ui.load_pha(id_unpiled, str(unpiled_pha))
+    ui.load_pha(id_piled, str(piled_pha))
 
     for idname in (id_unpiled, id_piled):
         ui.notice_id(idname, FIT_ELO, FIT_EHI)

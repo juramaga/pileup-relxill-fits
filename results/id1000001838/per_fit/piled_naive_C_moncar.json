@@ -1,0 +1,61 @@
+{
+  "spectrum": "piled_naive",
+  "stage": "C",
+  "method": "moncar",
+  "nfree": 7,
+  "maxfev": 4900,
+  "succeeded": false,
+  "message": "number of function evaluations has exceeded maxfev=4900",
+  "statval": 1140.7593025378014,
+  "statname": "cstat",
+  "numpoints": 665,
+  "dof": 658,
+  "rstat": 1.7336767515772058,
+  "nfev": 4900,
+  "parnames": [
+    "abs_piled_naive.nH",
+    "refl_piled_naive.a",
+    "refl_piled_naive.Incl",
+    "refl_piled_naive.gamma",
+    "refl_piled_naive.logxi",
+    "refl_piled_naive.refl_frac",
+    "refl_piled_naive.norm"
+  ],
+  "parvals": [
+    0.7111330569268777,
+    0.3728979942531438,
+    24.755678211568014,
+    1.2616586024741479,
+    2.5607325383691775,
+    24.822885939342086,
+    5.077028837070454e-05
+  ],
+  "covar_parnames": [
+    "abs_piled_naive.nH",
+    "refl_piled_naive.a",
+    "refl_piled_naive.Incl",
+    "refl_piled_naive.gamma",
+    "refl_piled_naive.logxi",
+    "refl_piled_naive.refl_frac",
+    "refl_piled_naive.norm"
+  ],
+  "covar_parmins": [
+    -0.00705335155182103,
+    -0.044751254490227294,
+    -0.6296633354040175,
+    -0.007481719841144405,
+    -0.023455247727535485,
+    -1.913127726663886,
+    -3.4302699216855587e-07
+  ],
+  "covar_parmaxes": [
+    0.00705335155182103,
+    0.044751254490227294,
+    0.6296633354040175,
+    0.007481719841144405,
+    0.023455247727535485,
+    1.913127726663886,
+    3.4302699216855587e-07
+  ],
+  "wall_time_s": 25.24941611289978
+}

@@ -21,14 +21,22 @@ from build_models import (
 )
 
 ROOT = Path(__file__).resolve().parent.parent
-RESULTS = ROOT / "results"
+from target import (  # noqa: E402
+    RESULTS_DIR as RESULTS, TARGET_ID, DEFAULT_ID, flagship_methods,
+    flagship_records,
+)
 PLOTS_DIR = RESULTS / "plots"
-PLOTS_DIR.mkdir(exist_ok=True)
+PLOTS_DIR.mkdir(parents=True, exist_ok=True)
 
 STAGE = "B"
 # see analysis_summary.json's best_per_group -> best_succeeded
-FLAGSHIP = {"unpiled": "levmar", "piled": "neldermead",
-            "piled_naive": "neldermead"}
+if TARGET_ID == DEFAULT_ID:
+    FLAGSHIP = flagship_methods(STAGE)
+    FLAGSHIP_RECORDS = None
+else:
+    # multi-start-checked physical Stage B flagship, see run_multistart.py
+    FLAGSHIP_RECORDS = flagship_records(STAGE)
+    FLAGSHIP = {s: r["source"] for s, r in FLAGSHIP_RECORDS.items()}
 
 
 def set_params_from_record(models, record):
@@ -41,6 +49,8 @@ def set_params_from_record(models, record):
 
 
 def load_record(spectrum, stage, method):
+    if FLAGSHIP_RECORDS is not None:
+        return FLAGSHIP_RECORDS[spectrum]
     with open(RESULTS / "fits_raw.json") as f:
         d = json.load(f)
     for r in d["records"]:
@@ -68,7 +78,7 @@ def plot_one(spectrum, fit_id, models, record):
     ax1.set_yscale("log")
     ax1.set_xscale("log")
     ax1.set_ylabel("counts / s / keV")
-    ax1.set_title(f"{spectrum} spectrum (ID 1000000081) -- Stage {STAGE}, "
+    ax1.set_title(f"{spectrum} spectrum (ID {TARGET_ID}) -- Stage {STAGE}, "
                    f"{FLAGSHIP[spectrum]}, cstat={record['statval']:.1f}, "
                    f"rstat={record['rstat']:.2f}")
     ax1.legend(fontsize=8, loc="lower left")

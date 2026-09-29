@@ -25,14 +25,24 @@ from build_models import (
 )
 
 ROOT = Path(__file__).resolve().parent.parent
-RESULTS = ROOT / "results"
+from target import (  # noqa: E402
+    RESULTS_DIR as RESULTS, TARGET_ID, DEFAULT_ID, flagship_methods,
+    flagship_records,
+)
 
 # From results/analysis_summary.json's best_per_group -> best_succeeded,
 # for Stage B (see Phase 4/5 discussion): unpiled's and piled_naive's best
 # formally-converged fit is neldermead... except unpiled's was run (and is
 # kept, to avoid re-running piled's 2490s conf) as levmar, its own winner.
-FLAGSHIP = {"unpiled": "levmar", "piled": "neldermead",
-            "piled_naive": "neldermead"}
+# Default ID: historical per-method choice, refit from the canonical start.
+# Other IDs: start from the multi-start-checked physical Stage B flagship
+# record (target.flagship_records) and re-polish with levmar from there.
+if TARGET_ID == DEFAULT_ID:
+    FLAGSHIP = flagship_methods()
+    FLAGSHIP_RECORDS = {}
+else:
+    FLAGSHIP_RECORDS = flagship_records()
+    FLAGSHIP = {s: "levmar" for s in FLAGSHIP_RECORDS}
 STAGE = "B"
 
 
@@ -48,6 +58,13 @@ def run_flagship(spectrum, method, id_unpiled, id_piled):
         absmodel, relmodel = build_piled_naive_model(id_piled, STAGE)
         pmod = None
         fit_id = id_piled
+
+    rec = FLAGSHIP_RECORDS.get(spectrum)
+    if rec is not None:
+        byname = {p.fullname: p for m in (absmodel, relmodel, pmod) if m
+                  for p in m.pars}
+        for n, v in zip(rec["parnames"], rec["parvals"]):
+            byname[n].val = v
 
     ui.set_method(method)
     allpars = list(absmodel.pars) + list(relmodel.pars) + \
@@ -83,6 +100,7 @@ def run_flagship(spectrum, method, id_unpiled, id_piled):
 
     return dict(
         spectrum=spectrum, stage=STAGE, method=method,
+        start_source=(rec or {}).get("source", "canonical start"),
         statval=fr.statval, dof=fr.dof, rstat=fr.statval / fr.dof,
         fit_time_s=fit_time,
         covar_time_s=covar_time, conf_time_s=conf_time,

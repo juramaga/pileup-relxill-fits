@@ -1,0 +1,44 @@
+{
+  "spectrum": "piled",
+  "stage": "B",
+  "start": {
+    "a": 0.0,
+    "logxi": 2.5,
+    "Afe": 1.0,
+    "refl_frac": 3.0
+  },
+  "nfree": 10,
+  "levmar_statval": 760.0710131450335,
+  "method": "levmar+neldermead",
+  "succeeded": true,
+  "message": "Optimization terminated successfully",
+  "statval": 759.9965989908454,
+  "dof": 655,
+  "rstat": 1.1603001511310618,
+  "nfev": 2403,
+  "parnames": [
+    "pileup_piled.alpha",
+    "pileup_piled.f",
+    "abs_piled.nH",
+    "refl_piled.a",
+    "refl_piled.Incl",
+    "refl_piled.gamma",
+    "refl_piled.logxi",
+    "refl_piled.Afe",
+    "refl_piled.refl_frac",
+    "refl_piled.norm"
+  ],
+  "parvals": [
+    0.11193417086924842,
+    0.9383904681788355,
+    0.6571741094289124,
+    0.43923319063934513,
+    29.191478741347876,
+    2.0555957550374333,
+    0.00075433071327742,
+    4.2950179777881,
+    34.752483357251975,
+    0.00025552827298129066
+  ],
+  "wall_time_s": 19.60491108894348
+}

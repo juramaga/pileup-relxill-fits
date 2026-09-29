@@ -1,0 +1,61 @@
+{
+  "spectrum": "piled_naive",
+  "stage": "C",
+  "method": "levmar",
+  "nfree": 7,
+  "maxfev": 1400,
+  "succeeded": true,
+  "message": "successful termination",
+  "statval": 1140.709996272627,
+  "statname": "cstat",
+  "numpoints": 665,
+  "dof": 658,
+  "rstat": 1.733601818043506,
+  "nfev": 234,
+  "parnames": [
+    "abs_piled_naive.nH",
+    "refl_piled_naive.a",
+    "refl_piled_naive.Incl",
+    "refl_piled_naive.gamma",
+    "refl_piled_naive.logxi",
+    "refl_piled_naive.refl_frac",
+    "refl_piled_naive.norm"
+  ],
+  "parvals": [
+    0.7121354719607851,
+    0.37949533873025415,
+    24.80887976296897,
+    1.2625360613279404,
+    2.560287217277057,
+    25.237954693219702,
+    5.071105841143484e-05
+  ],
+  "covar_parnames": [
+    "abs_piled_naive.nH",
+    "refl_piled_naive.a",
+    "refl_piled_naive.Incl",
+    "refl_piled_naive.gamma",
+    "refl_piled_naive.logxi",
+    "refl_piled_naive.refl_frac",
+    "refl_piled_naive.norm"
+  ],
+  "covar_parmins": [
+    null,
+    null,
+    null,
+    -0.002724600489215881,
+    -0.022780440372701858,
+    null,
+    -1.817935767539132e-07
+  ],
+  "covar_parmaxes": [
+    null,
+    null,
+    null,
+    0.002724600489215881,
+    0.022780440372701858,
+    null,
+    1.817935767539132e-07
+  ],
+  "wall_time_s": 1.1435251235961914
+}

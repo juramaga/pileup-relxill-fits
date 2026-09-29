@@ -21,20 +21,11 @@ import relxill.ui  # noqa: F401  registers xsumrelxill etc. with Sherpa
 
 from load_data import setup_data
 
-# Ground truth for spectrum ID 1000000081 (see CLAUDE.md, Data section).
-# Used only (a) as the Stage D fiducial inclination, and (b) as a reference
-# point when reporting results -- never fed in as a fit starting value
-# except where a stage explicitly freezes a parameter to it.
-GROUND_TRUTH = dict(
-    Afe=2.630883212688745,
-    gamma=1.3305378369181775,
-    incl=30.880998978376304,
-    logxi=1.4965562318307917,
-    nH=0.6496974978433812,
-    norm=0.0972774295459766,
-    refl_frac=14.314656850285886,
-    spin=0.4929042376344323,
-)
+# Ground truth for the target spectrum (see target.py / CLAUDE.md Data
+# section). Used only (a) as the Stage D fiducial inclination, and (b) as a
+# reference point when reporting results -- never fed in as a fit starting
+# value except where a stage explicitly freezes a parameter to it.
+from target import GROUND_TRUTH  # noqa: E402
 
 STAGES = ("A", "B", "C", "D")
 

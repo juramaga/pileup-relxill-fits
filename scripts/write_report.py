@@ -9,8 +9,13 @@ Run: python write_report.py
 import json
 from pathlib import Path
 
+from target import (  # noqa: E402
+    RESULTS_DIR as RESULTS, TARGET_ID, DEFAULT_ID, GROUND_TRUTH,
+)
+
 ROOT = Path(__file__).resolve().parent.parent
-RESULTS = ROOT / "results"
+REL = RESULTS.relative_to(ROOT).as_posix()  # e.g. "results" or "results/id<ID>"
+IS_DEFAULT = TARGET_ID == DEFAULT_ID
 
 STAGES = ["A", "B", "C", "D"]
 METHODS = ["levmar", "neldermead", "moncar"]
@@ -26,7 +31,7 @@ STAGE_DESC = {
     "B": "standard freeze (Rin=-1 ISCO, Rout=400, single emissivity, "
          "Ecut=300)",
     "C": "Stage B + Afe=1 (solar)",
-    "D": "Stage C + Incl fixed at ground truth (~30.9 deg)",
+    "D": f"Stage C + Incl fixed at ground truth (~{GROUND_TRUTH['incl']:.1f} deg)",
 }
 GT_LABELS = {"a": "spin (a)", "Incl": "Incl (deg)", "gamma": "gamma",
              "logxi": "logxi", "Afe": "Afe", "refl_frac": "refl_frac",
@@ -112,7 +117,10 @@ def three_way_table(gtc, ground_truth):
     rows = ["| Parameter | Ground truth | unpiled | piled (corrected) | "
             "piled_naive (uncorrected) |",
             "|---|---|---|---|---|"]
-    entries = {s: gtc.get(f"{s}/B", {}).get("comparison", {}) for s in SPECTRA}
+    # non-default IDs: the multi-start-checked physical flagship (see
+    # run_multistart.py); default ID: the fixed-start grid's best, as before
+    key = "B" if IS_DEFAULT else "B_flagship"
+    entries = {s: gtc.get(f"{s}/{key}", {}).get("comparison", {}) for s in SPECTRA}
     for short, label in GT_LABELS.items():
         truth = ground_truth.get(gt_key_map.get(short, short))
         cells = []
@@ -154,11 +162,11 @@ def main():
     gtc = summary["ground_truth_comparison"]
 
     lines = []
-    lines.append("# Fit metrics report -- relxill fit of spectrum ID 1000000081")
+    lines.append(f"# Fit metrics report -- relxill fit of spectrum ID {TARGET_ID}")
     lines.append("")
-    lines.append("Generated from `results/fits_raw.json`, "
-                  "`results/analysis_summary.json`, and "
-                  "`results/conf_flagship.json` by "
+    lines.append(f"Generated from `{REL}/fits_raw.json`, "
+                  f"`{REL}/analysis_summary.json`, and "
+                  f"`{REL}/conf_flagship.json` by "
                   "`scripts/write_report.py`. See `CLAUDE.md` for the full "
                   "methodology (Phases 1-5); this document reports results "
                   "only.")
@@ -203,10 +211,25 @@ def main():
 
     lines.append("## Headline result: Stage B, all three cases vs. ground truth")
     lines.append("")
-    lines.append("This is the comparison of primary interest -- the "
-                  "literature-standard freezing stage, for all three "
-                  "spectrum/model cases, each using its own best "
-                  "formally-converged method.")
+    if IS_DEFAULT:
+        lines.append("This is the comparison of primary interest -- the "
+                      "literature-standard freezing stage, for all three "
+                      "spectrum/model cases, each using its own best "
+                      "formally-converged method.")
+    else:
+        lines.append("This is the comparison of primary interest -- the "
+                      "literature-standard freezing stage, for all three "
+                      "spectrum/model cases, each using its **multi-start "
+                      "flagship** fit (lowest-cstat solution with "
+                      "refl_frac > 0 over the grid and "
+                      "`run_multistart.py`; see \"Multi-start check\" "
+                      "below for why the fixed-start grid's own best "
+                      "can't be used here). Flagship sources/cstat: "
+                      + "; ".join(
+                          f"{s} = {gtc[f'{s}/B_flagship']['source']}, "
+                          f"cstat {gtc[f'{s}/B_flagship']['statval']:.1f}"
+                          for s in SPECTRA if f"{s}/B_flagship" in gtc)
+                      + ".")
     lines.append("")
     lines.append(three_way_table(gtc, ground_truth))
     lines.append("")
@@ -224,7 +247,16 @@ def main():
         lines.append("")
         lines.append(stage_method_table(records, spectrum))
         lines.append("")
-        if spectrum in ("piled", "piled_naive"):
+        n_a_crash = sum(1 for r in records if r["spectrum"] == spectrum
+                        and r["stage"] == "A" and r.get("message") in
+                        ("CRASHED", "TIMEOUT", "PYTHON_EXCEPTION"))
+        if not IS_DEFAULT and n_a_crash:
+            lines.append(f"Stage A: {n_a_crash} of {len(METHODS)} "
+                          "optimizers crashed/timed out on this spectrum "
+                          "(relxill hard-aborts on unphysical Rout<=Rin "
+                          "excursions -- see CLAUDE.md Phase 4).")
+            lines.append("")
+        if IS_DEFAULT and spectrum in ("piled", "piled_naive"):
             lines.append("Stage A crashed for all three optimizers on this "
                           "spectrum (relxill's C++ code hard-aborts on an "
                           "unphysical Rout<=Rin excursion). This happens "
@@ -301,82 +333,88 @@ def main():
         lines.append("")
         lines.append(conf_vs_covar_table(flag))
         lines.append("")
-    lines.append("**Takeaways**: for the unpiled fit, `conf`'s intervals are "
-                  "noticeably larger (and asymmetric) than `covar`'s -- e.g. "
-                  "spin: covar +/-0.00008 vs. conf [-0.0055,+0.0106], "
-                  "refl_frac: covar +/-0.20 vs. conf [-0.69,+0.19] -- "
-                  "`covar`'s linearized/Gaussian approximation is "
-                  "substantially overconfident here. For the piled fit, "
-                  "`covar` failed outright (every bound came back undefined "
-                  "-- the Hessian was singular/hit a parameter boundary "
-                  "during its numerical differencing), while `conf` still "
-                  "produced usable (if boundary-limited on `alpha`, `gamma`, "
-                  "`logxi`) intervals, at a real cost: ~2490s vs. 3s. "
-                  "`covar` failed the same way on `piled_naive` (again all "
-                  "bounds undefined), and `conf` there is even slower "
-                  "relative to `covar` (~1252x) and produces a strikingly "
-                  "asymmetric `refl_frac` interval ([-1.78, +29.5]) -- a "
-                  "large, lopsided uncertainty that is itself a symptom of "
-                  "just how poorly determined that parameter is once "
-                  "pileup goes uncorrected. Concretely: `covar` is cheap "
-                  "and fine as a rough guide on "
-                  "a well-converged fit, but should not be trusted as the "
-                  "final word on parameter uncertainty for a model this "
-                  "nonlinear, and can fail silently-ish (all-`None` bounds) "
-                  "exactly when the fit is least well-behaved -- which is "
-                  "when you'd want it most.")
-    lines.append("")
+    if not IS_DEFAULT:
+        interp = RESULTS / "interpretation.md"
+        lines.append(interp.read_text().rstrip() if interp.exists() else
+                     "_(no interpretation.md written for this ID yet)_")
+        lines.append("")
+    if IS_DEFAULT:
+        lines.append("**Takeaways**: for the unpiled fit, `conf`'s intervals are "
+                      "noticeably larger (and asymmetric) than `covar`'s -- e.g. "
+                      "spin: covar +/-0.00008 vs. conf [-0.0055,+0.0106], "
+                      "refl_frac: covar +/-0.20 vs. conf [-0.69,+0.19] -- "
+                      "`covar`'s linearized/Gaussian approximation is "
+                      "substantially overconfident here. For the piled fit, "
+                      "`covar` failed outright (every bound came back undefined "
+                      "-- the Hessian was singular/hit a parameter boundary "
+                      "during its numerical differencing), while `conf` still "
+                      "produced usable (if boundary-limited on `alpha`, `gamma`, "
+                      "`logxi`) intervals, at a real cost: ~2490s vs. 3s. "
+                      "`covar` failed the same way on `piled_naive` (again all "
+                      "bounds undefined), and `conf` there is even slower "
+                      "relative to `covar` (~1252x) and produces a strikingly "
+                      "asymmetric `refl_frac` interval ([-1.78, +29.5]) -- a "
+                      "large, lopsided uncertainty that is itself a symptom of "
+                      "just how poorly determined that parameter is once "
+                      "pileup goes uncorrected. Concretely: `covar` is cheap "
+                      "and fine as a rough guide on "
+                      "a well-converged fit, but should not be trusted as the "
+                      "final word on parameter uncertainty for a model this "
+                      "nonlinear, and can fail silently-ish (all-`None` bounds) "
+                      "exactly when the fit is least well-behaved -- which is "
+                      "when you'd want it most.")
+        lines.append("")
 
-    lines.append("## Interpretation: does correcting for pileup actually help?")
-    lines.append("")
-    lines.append("Referring back to the headline three-way table above:")
-    lines.append("")
-    lines.append("- **Fit quality alone cannot tell you whether pileup was "
-                  "handled correctly.** `piled_naive`'s best Stage B fit "
-                  "(cstat~1005.9, rstat~1.53) is statistically *at least as "
-                  "good as*, if not marginally better than, the "
-                  "jdpileup-corrected `piled` fit (cstat~1039.9, "
-                  "rstat~1.59) -- despite `piled_naive` using the "
-                  "structurally wrong model. `relxill`'s own free "
-                  "parameters (`refl_frac` especially -- see below) are "
-                  "flexible enough to partially absorb pileup's spectral "
-                  "distortion and produce an equally clean-looking fit "
-                  "to the wrong physical picture. The diagnostic plots "
-                  "below show this directly: the naive fit *looks* just "
-                  "as good as the corrected one.")
-    lines.append("- **Spin is severely biased high in *both* piled cases, "
-                  "corrected or not.** `piled` and `piled_naive` recover "
-                  "spin within a few percent of *each other*, but both are "
-                  "biased roughly 75-78% high relative to the unpiled fit's "
-                  "close-to-truth ~-3%. On this evidence, `jdpileup` "
-                  "correction does essentially nothing to rescue the spin "
-                  "measurement for this source/pileup level -- a materially "
-                  "important caveat for anyone using `relxill` on a "
-                  "pileup-corrected Chandra spectrum to measure spin.")
-    lines.append("- **`refl_frac` is the clearest single tracer of *whether* "
-                  "pileup was corrected for, even though it doesn't track "
-                  "spin's bias.** It's biased high in all three cases "
-                  "(again likely entangled with the known `norm` "
-                  "convention mismatch, Phase 3), but far more extremely in "
-                  "the uncorrected `piled_naive` fit (+134%) than in either "
-                  "the corrected `piled` fit (+34%) or the `unpiled` fit "
-                  "(+65%) -- consistent with the fit inflating reflection "
-                  "fraction to compensate for the flux jdpileup would "
-                  "otherwise have accounted for.")
-    lines.append("- **Inclination and nH are comparatively robust** across "
-                  "all three cases (within ~2-9% of truth everywhere) -- "
-                  "not everything is equally vulnerable to pileup.")
-    lines.append("- **gamma and logxi are, perhaps counterintuitively, "
-                  "*closer* to the unpiled fit's bias in the uncorrected "
-                  "`piled_naive` fit than in the jdpileup-corrected `piled` "
-                  "fit** (see the table). This doesn't mean skipping the "
-                  "pileup correction is a good idea -- the fit quality "
-                  "argument above and the badly-biased spin and refl_frac "
-                  "values say otherwise -- but it's a reminder that "
-                  "\"correcting\" for an instrumental effect with an "
-                  "imperfect model does not uniformly move every parameter "
-                  "closer to the truth.")
-    lines.append("")
+        lines.append("## Interpretation: does correcting for pileup actually help?")
+        lines.append("")
+        lines.append("Referring back to the headline three-way table above:")
+        lines.append("")
+        lines.append("- **Fit quality alone cannot tell you whether pileup was "
+                      "handled correctly.** `piled_naive`'s best Stage B fit "
+                      "(cstat~1005.9, rstat~1.53) is statistically *at least as "
+                      "good as*, if not marginally better than, the "
+                      "jdpileup-corrected `piled` fit (cstat~1039.9, "
+                      "rstat~1.59) -- despite `piled_naive` using the "
+                      "structurally wrong model. `relxill`'s own free "
+                      "parameters (`refl_frac` especially -- see below) are "
+                      "flexible enough to partially absorb pileup's spectral "
+                      "distortion and produce an equally clean-looking fit "
+                      "to the wrong physical picture. The diagnostic plots "
+                      "below show this directly: the naive fit *looks* just "
+                      "as good as the corrected one.")
+        lines.append("- **Spin is severely biased high in *both* piled cases, "
+                      "corrected or not.** `piled` and `piled_naive` recover "
+                      "spin within a few percent of *each other*, but both are "
+                      "biased roughly 75-78% high relative to the unpiled fit's "
+                      "close-to-truth ~-3%. On this evidence, `jdpileup` "
+                      "correction does essentially nothing to rescue the spin "
+                      "measurement for this source/pileup level -- a materially "
+                      "important caveat for anyone using `relxill` on a "
+                      "pileup-corrected Chandra spectrum to measure spin.")
+        lines.append("- **`refl_frac` is the clearest single tracer of *whether* "
+                      "pileup was corrected for, even though it doesn't track "
+                      "spin's bias.** It's biased high in all three cases "
+                      "(again likely entangled with the known `norm` "
+                      "convention mismatch, Phase 3), but far more extremely in "
+                      "the uncorrected `piled_naive` fit (+134%) than in either "
+                      "the corrected `piled` fit (+34%) or the `unpiled` fit "
+                      "(+65%) -- consistent with the fit inflating reflection "
+                      "fraction to compensate for the flux jdpileup would "
+                      "otherwise have accounted for.")
+        lines.append("- **Inclination and nH are comparatively robust** across "
+                      "all three cases (within ~2-9% of truth everywhere) -- "
+                      "not everything is equally vulnerable to pileup.")
+        lines.append("- **gamma and logxi are, perhaps counterintuitively, "
+                      "*closer* to the unpiled fit's bias in the uncorrected "
+                      "`piled_naive` fit than in the jdpileup-corrected `piled` "
+                      "fit** (see the table). This doesn't mean skipping the "
+                      "pileup correction is a good idea -- the fit quality "
+                      "argument above and the badly-biased spin and refl_frac "
+                      "values say otherwise -- but it's a reminder that "
+                      "\"correcting\" for an instrumental effect with an "
+                      "imperfect model does not uniformly move every parameter "
+                      "closer to the truth.")
+        lines.append("")
 
     lines.append("## Diagnostic plots (Stage B best fit, all three cases)")
     lines.append("")
@@ -388,10 +426,11 @@ def main():
     lines.append("![piled_naive Stage B fit (uncorrected)]"
                   "(plots/piled_naive_stageB_fit.png)")
     lines.append("")
-    lines.append("Note how visually similar the `piled` and `piled_naive` "
-                  "fits are -- this is the same point made above: you "
-                  "cannot tell from the fit residuals alone whether pileup "
-                  "was actually corrected for.")
+    if IS_DEFAULT:
+        lines.append("Note how visually similar the `piled` and `piled_naive` "
+                      "fits are -- this is the same point made above: you "
+                      "cannot tell from the fit residuals alone whether pileup "
+                      "was actually corrected for.")
     lines.append("")
 
     lines.append("## Caveats carried through from earlier phases")

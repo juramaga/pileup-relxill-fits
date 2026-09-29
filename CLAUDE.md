@@ -614,3 +614,64 @@ at the top of this file.
   `tbabs`, but not stated).
 - Any preference on notebook/write-up format or location beyond what's
   sketched above?
+
+## Phase 6 — Second target: ID 1000001838 (moderate pileup) — DONE (2026-09-28)
+
+**Why this ID.** Pileup level per simulation isn't a column in the index
+CSV, but count loss = 1 − (piled rate / unpiled rate) is derivable from it
+(median over the 100k grid: 44%). 081 is extreme (93% loss, ~15 incident
+counts per 3.2 s frame; N(unpiled)/N(piled) = 14.33). 1838 was chosen by
+the user from ~30%-loss candidates whose simulation inputs are closest to
+081's (loss 30%, ~0.62 counts/frame, N(unpiled)/N(piled) = 1.43; Γ 1.39,
+a 0.42, i 26°, nH 0.65, same RMF `c07_x222_y0531`). Main differences: ~25×
+fewer counts (152k unpiled), Afe 7.3, logξ 2.39, refl_frac 6.6. Same shared
+ARF (`id1000000000_arf.fits`) used, by extension of the user's instruction
+for 081. That's an assumption, not re-confirmed with the user.
+
+**Pipeline is now multi-ID.** `scripts/target.py` reads `TARGET_ID` from
+the environment (default 1000000081, whose outputs stay directly under
+`results/`); any other ID writes under `results/id<ID>/`, and its ground
+truth is read from the index CSV. Every script imports from there;
+`setup_data()` also takes an explicit `target_id=` (used by the notebook's
+Part 2). Regenerating 081's report/summary with the patched scripts was
+verified to reproduce the committed files (report byte-identical; summary
+value-identical, with `method_agreement` key order now deterministic).
+PHA headers for 1838 point RESPFILE/ANCRFILE at the main checkout's
+`responses/` (same convention as 081's).
+
+**New: Stage B multi-start (`run_multistart.py`, `multistart_worker.py`).**
+The fixed-start grid was not enough for 1838. Piled Stage C (Afe frozen,
+a subset of Stage B) beat every piled Stage B fit, and the "best" piled
+Stage B grid fit had refl_frac = −16.8 (relxill's reflection-only branch).
+The multi-start reruns Stage B from a truth-agnostic lattice (a × logξ ×
+Afe, 12 points) plus 6 seeds from the grid's Stage C/D end points
+(`levmar` → `neldermead` polish, subprocess each). The flagship for each case
+(`target.flagship_records()`) is the lowest-cstat solution with
+refl_frac > 0 over grid + multi-start. `analyze_results.py` stores it as
+`<case>/B_flagship` in the ground-truth comparison; the conf/covar step,
+plots, report headline and notebook Part 2 all use it. Result: flagship
+cstat unpiled 733.6→702.0, piled 970 (unphysical)→702.6, naive
+1059→1042.7. Seeds from the grid's Stage C/D fits never beat the lattice.
+**081 has not been multi-started**, so some of its Stage B biases
+(e.g. unpiled logξ −33%, refl_frac +65%) may be local-minimum artifacts.
+Running `run_multistart.py` on 081 is the obvious follow-up (~1 h).
+
+**Findings (full numbers in `results/id1000001838/report.md`):**
+- At ~30% loss, jdpileup works: corrected piled ≈ unpiled in both fit
+  quality (cstat 702.6 vs 702.0, reduced 1.07) and parameters (spin +18%
+  vs +13% of truth; refl_frac +1% vs −4%). This contrasts with 081, where
+  corrected spin was still +76% biased.
+- The uncorrected fit is badly biased (spin retrograde, −0.34 vs +0.42;
+  logξ and Afe at their lower limits; refl_frac +130%). Here, unlike 081,
+  **the fit statistic reveals it**: Δcstat ≈ 340 on the same data, with
+  structured residuals (2–2.3 keV edge, >7 keV excess).
+- Afe runs to relxill's upper limit (10) in both good fits (truth 7.3).
+  It's poorly constrained at this count level.
+- Stage A: 5/9 crashed (081: 6/9), including one *unpiled* crash
+  (`moncar`), so the `Rout<=Rin` abort isn't piled-data-specific.
+  `levmar` doesn't stall on jdpileup here (081: stalled at cstat ~76k).
+
+Notebook: `scripts/build_notebook.py` now emits Part 1 (081, unchanged) and
+Part 2 (1838: live canonical-start fits showing the refl_frac<0 trap,
+multi-start tables, flagship plots, grid, truth table, conf/covar, and an
+081-vs-1838 bias table). The didactic write-up was not updated for 1838.

@@ -22,10 +22,10 @@ import time
 from pathlib import Path
 
 from build_models import STAGES, GROUND_TRUTH
+from target import TARGET_ID, RESULTS_DIR
 
 ROOT = Path(__file__).resolve().parent.parent
-RESULTS_DIR = ROOT / "results"
-RESULTS_DIR.mkdir(exist_ok=True)
+RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 PER_FIT_DIR = RESULTS_DIR / "per_fit"
 PER_FIT_DIR.mkdir(exist_ok=True)
 OUTFILE = RESULTS_DIR / "fits_raw.json"
@@ -84,7 +84,8 @@ def main():
         records.append(rec)
 
         with open(OUTFILE, "w") as f:
-            json.dump(dict(ground_truth=GROUND_TRUTH, records=records), f,
+            json.dump(dict(target_id=TARGET_ID, ground_truth=GROUND_TRUTH,
+                           records=records), f,
                        indent=2)
 
     n_bad = sum(1 for r in records if r.get("message") in
